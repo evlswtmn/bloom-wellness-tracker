@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Wellness palette — soft sage greens, warm cream, earthy rose */
+    --background: 45 30% 97%;
+    --foreground: 150 15% 15%;
+
+    --card: 45 25% 98%;
+    --card-foreground: 150 15% 15%;
+
+    --popover: 45 25% 98%;
+    --popover-foreground: 150 15% 15%;
+
+    --primary: 152 35% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 45 30% 93%;
+    --secondary-foreground: 150 15% 20%;
+
+    --muted: 45 20% 93%;
+    --muted-foreground: 150 8% 48%;
+
+    --accent: 12 55% 70%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 12% 86%;
+    --input: 150 12% 86%;
+    --ring: 152 35% 38%;
+
+    --radius: 0.6rem;
+
+    /* Chart colors */
+    --chart-1: 152 35% 38%;
+    --chart-2: 12 55% 65%;
+    --chart-3: 200 45% 50%;
+    --chart-4: 45 70% 55%;
+    --chart-5: 280 35% 55%;
+  }
+
+  .dark {
+    --background: 150 15% 8%;
+    --foreground: 45 20% 90%;
+
+    --card: 150 12% 11%;
+    --card-foreground: 45 20% 90%;
+
+    --popover: 150 12% 11%;
+    --popover-foreground: 45 20% 90%;
+
+    --primary: 152 40% 52%;
+    --primary-foreground: 150 15% 8%;
+
+    --secondary: 150 10% 18%;
+    --secondary-foreground: 45 15% 80%;
+
+    --muted: 150 10% 16%;
+    --muted-foreground: 150 8% 55%;
+
+    --accent: 12 50% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 10% 22%;
+    --input: 150 10% 22%;
+    --ring: 152 40% 52%;
+
+    --chart-1: 152 40% 55%;
+    --chart-2: 12 50% 60%;
+    --chart-3: 200 45% 60%;
+    --chart-4: 45 65% 60%;
+    --chart-5: 280 35% 60%;
+  }
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100dvh;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+    line-height: 1.2;
+    font-family: 'Chillax', 'Plus Jakarta Sans', sans-serif;
+  }
+
+  p, li, figcaption {
+    text-wrap: pretty;
+  }
+
+  img, picture, video, canvas, svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  input, button, textarea, select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button { cursor: pointer; }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; }
+
+/* Progress bar animation */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to { width: var(--progress-value); }
+}
+
+/* Calorie surplus/deficit color coding */
+.surplus { color: hsl(12 55% 60%); }
+.deficit { color: hsl(152 35% 38%); }
+
+/* Shimmer for skeleton */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--secondary)) 50%, hsl(var(--muted)) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 6px;
+}
