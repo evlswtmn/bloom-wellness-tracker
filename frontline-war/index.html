@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Frontline War</title>
+  <style>
+    /* ===== RESET & VARIABLES ===== */
+    :root {
+      --player-color: #3b82f6;
+      --npc-color:    #ef4444;
+      --gold:         #fbbf24;
+      --bg-deep:      #0f172a;
+      --bg-mid:       #1e293b;
+      --bg-card:      #273449;
+      --text-main:    #f1f5f9;
+      --text-muted:   #94a3b8;
+      --radius:       10px;
+      --shadow:       0 4px 20px rgba(0,0,0,0.5);
+      --trans:        0.3s ease;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-deep); color: var(--text-main);
+      user-select: none; -webkit-user-select: none;
+      font-size: 15px;
+    }
+
+    /* ===== SHARED BUTTON ===== */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; border-radius: var(--radius);
+      font-weight: 700; cursor: pointer;
+      transition: transform .1s, box-shadow .1s, opacity .2s;
+      min-height: 44px; padding: 10px 18px; font-size: .9rem;
+      letter-spacing: .03em; line-height: 1.2;
+      text-align: center; touch-action: manipulation;
+    }
+    .btn:active { transform: scale(.95); }
+    .btn:disabled { opacity: .45; pointer-events: none; }
+    .btn-gold    { background: linear-gradient(135deg,#f59e0b,#d97706); color:#111; box-shadow:0 4px 14px rgba(245,158,11,.4); }
+    .btn-blue    { background: linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; box-shadow:0 3px 12px rgba(37,99,235,.4); }
+    .btn-slate   { background: linear-gradient(135deg,#475569,#334155); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.35); }
+    .btn-red     { background: linear-gradient(135deg,#dc2626,#b91c1c); color:#fff; box-shadow:0 3px 12px rgba(220,38,38,.35); }
+    .btn-xs      { min-height: 34px; padding: 5px 10px; font-size:.72rem; border-radius:7px; }
+    .btn-sm      { min-height: 38px; padding: 7px 13px; font-size:.78rem; }
+    .btn-block   { width:100%; }
+    .btn-lg      { min-height: 52px; font-size: 1.05rem; padding: 13px 22px; }
+
+    /* ===== SCREEN SYSTEM ===== */
+    .screen {
+      position: fixed; inset: 0;
+      display: none; flex-direction: column;
+      align-items: center; overflow: hidden;
+    }
+    .screen.active { display: flex; }
+
+    /* ===== TITLE SCREEN ===== */
+    #titleScreen {
+      background: radial-gradient(ellipse at 50% 0%, #1e3a5f 0%, #0f172a 70%);
+      justify-content: center; padding: 24px 20px;
+      gap: 0;
+    }
+    .title-logo-wrap { text-align: center; margin-bottom: 8px; }
+    .title-logo {
+      font-size: clamp(2.2rem, 9vw, 3.8rem);
+      font-weight: 900; letter-spacing: .04em;
+      background: linear-gradient(180deg, #fde68a, #f59e0b);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1.1; display: block;
+    }
+    .title-sub {
+      font-size: clamp(.85rem, 3.2vw, 1.05rem);
+      color: var(--text-muted); margin-top: 6px; display: block;
+    }
+    .title-deco {
+      font-size: 2.5rem; margin-bottom: 4px; display: block;
+      animation: swordBob 2.5s ease-in-out infinite;
+    }
+    @keyframes swordBob {
+      0%,100%{transform:translateY(0) rotate(-5deg);}
+      50%{transform:translateY(-6px) rotate(5deg);}
+    }
+    .title-instructions {
+      background: rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
+      border-radius: var(--radius); padding: 14px 18px;
+      font-size: .82rem; color: var(--text-muted); line-height: 1.65;
+      text-align: center; max-width: 340px; width:100%;
+      margin: 16px 0 20px;
+    }
+    .title-instructions strong { color: var(--gold); }
+    .title-buttons { display:flex; flex-direction:column; gap:10px; width:100%; max-width:300px; align-items:center; }
+    .title-stat-bar {
+      margin-top: 18px; display:flex; gap:20px; justify-content:center;
+      color: var(--text-muted); font-size:.8rem;
+    }
+    .title-stat-bar b { color: var(--text-main); font-size: .95rem; }
+    .title-reset { font-size:.72rem; color:var(--text-muted); margin-top:6px; cursor:pointer; text-decoration:underline; }
+
+    /* ===== OPPONENT PICKER ===== */
+    #opponentPicker {
+      background: rgba(0,0,0,.93); z-index: 200;
+      padding: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      gap: 14px;
+    }
+    .picker-head { font-size:1.25rem; font-weight:800; color:var(--gold); text-align:center; margin-top:8px; }
+    .picker-sub  { font-size:.78rem; color:var(--text-muted); text-align:center; margin-top:2px; }
+    .opp-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 10px; width:100%; max-width:380px; margin: 4px 0;
+    }
+    .opp-tile {
+      background: var(--bg-mid); border:2px solid rgba(255,255,255,.1);
+      border-radius: 12px; padding: 14px 8px; cursor: pointer;
+      transition: border-color .2s, transform .12s;
+      text-align: center; touch-action: manipulation;
+    }
+    .opp-tile:active { transform: scale(.97); }
+    .opp-tile.selected { border-color: var(--gold); }
+    .opp-avatar-ring {
+      width:54px; height:54px; border-radius:50%;
+      margin:0 auto 8px; display:flex; align-items:center; justify-content:center;
+      font-size:1.9rem; border:2px solid rgba(255,255,255,.15);
+    }
+    .opp-tile-name  { font-weight:700; font-size:.82rem; color:var(--text-main); }
+    .opp-tile-style { font-size:.68rem; color:var(--text-muted); margin-top:3px; line-height:1.3; }
+    .picker-actions { display:flex; flex-direction:column; gap:8px; width:100%; max-width:280px; }
+
+    /* ===== GAME SCREEN ===== */
+    #gameScreen {
+      background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+    }
+
+    /* Header */
+    .g-header {
+      width:100%; flex-shrink:0;
+      background: rgba(0,0,0,.55); backdrop-filter:blur(12px);
+      border-bottom:1px solid rgba(255,255,255,.08);
+      padding: 5px 12px; display:flex; align-items:center; gap:8px;
+      z-index: 20;
+    }
+    .g-header-title { font-size:.85rem; font-weight:900; color:var(--gold); letter-spacing:.06em; flex-shrink:0; }
+    .g-header-stats { display:flex; gap:14px; flex:1; justify-content:center; }
+    .g-stat { display:flex; flex-direction:column; align-items:center; font-size:.65rem; color:var(--text-muted); line-height:1.1; }
+    .g-stat-val { font-weight:700; font-size:.88rem; color:var(--text-main); }
+    .g-header-btns { display:flex; gap:5px; flex-shrink:0; }
+
+    /* Game layout */
+    .g-body { flex:1; min-height:0; display:flex; flex-direction:column; width:100%; max-width:480px; }
+
+    /* ---- NPC ZONE ---- */
+    .npc-zone {
+      flex-shrink:0; padding: 8px 12px 4px;
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+    }
+    .npc-info-row { display:flex; align-items:center; gap:10px; width:100%; }
+    .npc-avatar {
+      width:42px; height:42px; border-radius:50%; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.6rem; border:2px solid rgba(255,255,255,.2);
+    }
+    .npc-meta { flex:1; min-width:0; }
+    .npc-name-line { font-weight:700; font-size:.9rem; }
+    .npc-cards-line { font-size:.7rem; color:var(--text-muted); }
+    .taunt-bubble {
+      flex:2; min-width:0; max-width:200px;
+      background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
+      border-radius:9px; padding:6px 10px;
+      font-size:.7rem; color:var(--text-muted); font-style:italic;
+      min-height:30px; display:flex; align-items:center; line-height:1.35;
+      transition: opacity .3s;
+    }
+    .npc-card-row { display:flex; gap:10px; align-items:center; justify-content:center; }
+
+    /* ---- CARDS ---- */
+    .card-slot {
+      width:56px; height:80px; flex-shrink:0;
+      border-radius:8px; position:relative;
+    }
+    @media(min-width:420px){ .card-slot{ width:64px; height:90px; } }
+    .card-deck-visual {
+      width:56px; height:80px; flex-shrink:0;
+      border-radius:8px; background: linear-gradient(135deg,#1e3a5f,#0f2340);
+      border:2px solid rgba(255,255,255,.12);
+      display:flex; align-items:center; justify-content:center; position:relative;
+      font-size:.72rem; color:rgba(255,255,255,.55); font-weight:600;
+      transition: opacity .3s;
+    }
+    @media(min-width:420px){ .card-deck-visual{ width:64px; height:90px; } }
+    .card-deck-visual::before {
+      content:''; position:absolute; inset:5px; border-radius:4px;
+      border:1.5px solid rgba(255,255,255,.1);
+      background: repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.03) 4px,rgba(255,255,255,.03) 8px);
+    }
+    .card-deck-visual span { position:relative; z-index:1; }
+    .card-deck-visual.empty { opacity:.3; }
+    .playing-card {
+      position:absolute; inset:0; border-radius:8px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:2px; border:2px solid rgba(0,0,0,.15);
+      transition: transform .2s, box-shadow .2s, opacity .2s;
+      overflow:hidden;
+    }
+    .playing-card.face-up { background:#fff; }
+    .playing-card.face-down {
+      background: linear-gradient(135deg,#1e3a5f,#0f2340);
+    }
+    .playing-card.face-down::after {
+      content:''; position:absolute; inset:6px;
+      border:1.5px solid rgba(255,255,255,.12); border-radius:4px;
+      background: repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.04) 4px,rgba(255,255,255,.04) 8px);
+    }
+    .card-rank { font-size:1.1rem; line-height:1; font-weight:900; }
+    .card-suit { font-size:1rem;  line-height:1; font-weight:700; }
+    .playing-card.red  { color:#dc2626; }
+    .playing-card.dark { color:#1a1a1a; }
+    .playing-card.glow-win  { box-shadow:0 0 18px 4px #fbbf24, 0 0 6px 1px #fbbf24 inset; transform:scale(1.07); }
+    .playing-card.dim-lose  { opacity:.5; filter:grayscale(.5); }
+    @keyframes flipIn {
+      0%   { transform:scaleX(0) translateY(-14px); opacity:0; }
+      55%  { transform:scaleX(.9); }
+      100% { transform:scaleX(1) translateY(0); opacity:1; }
+    }
+    @keyframes winBounce {
+      0%,100%{transform:scale(1.07) translateY(0);}
+      50%{transform:scale(1.12) translateY(-5px);}
+    }
+    @keyframes loseShake {
+      0%,100%{transform:translateX(0);}
+      20%{transform:translateX(-5px);}
+      40%{transform:translateX(5px);}
+      60%{transform:translateX(-3px);}
+      80%{transform:translateX(3px);}
+    }
+    .playing-card.anim-flip { animation:flipIn .35s ease forwards; }
+    .playing-card.anim-win  { animation:winBounce .55s ease; }
+    .playing-card.anim-lose { animation:loseShake .4s ease; }
+
+    /* ---- BATTLEFIELD ---- */
+    .bf-zone {
+      flex:1; min-height:0; display:flex; flex-direction:column;
+      align-items:center; padding:2px 12px 2px; justify-content:center;
+    }
+    .suspense-text {
+      font-size:clamp(.82rem,3.5vw,.98rem); font-weight:800; color:var(--gold);
+      text-align:center; height:26px; line-height:26px; letter-spacing:.04em;
+      text-shadow:0 0 12px rgba(251,191,36,.5);
+    }
+    .battlefield {
+      width:100%; max-width:400px; height:clamp(100px,22vw,130px);
+      border-radius:12px; border:2px solid rgba(255,255,255,.1);
+      position:relative; overflow:hidden; flex-shrink:0;
+    }
+    /* Sky */
+    .bf-sky {
+      position:absolute; inset:0;
+      background: linear-gradient(180deg,#7eb8d8 0%,#a3cfee 18%,#c8e6c4 30%,#8fb563 42%,#7a5c30 50%,#8fb563 58%,#c8e6c4 70%,#a3cfee 82%,#7eb8d8 100%);
+    }
+    /* Terrain detail strips */
+    .bf-terrain { position:absolute; inset:0; }
+    .bf-terrain::before {
+      content:''; position:absolute; left:0; right:0; top:38%; height:24%;
+      background: repeating-linear-gradient(90deg,#6b4c1e 0,#6b4c1e 20px,#7a5c30 20px,#7a5c30 40px);
+      opacity:.55;
+    }
+    /* Player / NPC tinted halves */
+    .bf-p-half {
+      position:absolute; left:0; top:0; bottom:0;
+      background:rgba(37,99,235,.14);
+      transition:width .7s cubic-bezier(.34,1.56,.64,1);
+    }
+    .bf-n-half {
+      position:absolute; right:0; top:0; bottom:0;
+      background:rgba(220,38,38,.14);
+      transition:width .7s cubic-bezier(.34,1.56,.64,1);
+    }
+    /* Frontline */
+    .frontline {
+      position:absolute; top:0; bottom:0; width:3px;
+      background:linear-gradient(180deg,#fde68a,#f59e0b);
+      box-shadow:0 0 10px rgba(251,191,36,.9);
+      transition:left .7s cubic-bezier(.34,1.56,.64,1);
+      z-index:8;
+    }
+    .frontline-gem {
+      position:absolute; top:50%; left:50%; width:14px; height:14px;
+      transform:translate(-50%,-50%) rotate(45deg);
+      background:var(--gold); box-shadow:0 0 8px rgba(251,191,36,.9);
+    }
+    @keyframes flShake {
+      0%,100%{transform:translateX(-50%);}
+      20%{transform:translateX(calc(-50% - 5px)) rotate(-2deg);}
+      40%{transform:translateX(calc(-50% + 5px)) rotate(2deg);}
+      60%{transform:translateX(calc(-50% - 3px));}
+      80%{transform:translateX(calc(-50% + 2px));}
+    }
+    .frontline.shake { animation:flShake .55s ease; }
+    /* Flags */
+    .bf-flag {
+      position:absolute; top:12%; z-index:6;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    .bf-flag-p { left:10px; }
+    .bf-flag-n { right:10px; }
+    .flag-pole { width:3px; height:34px; background:#6b3a00; }
+    .flag-cloth {
+      width:20px; height:13px; margin-bottom:-2px;
+      animation:waveflag 1.8s ease-in-out infinite;
+      transform-origin:left center;
+    }
+    .flag-cloth-p { background:#2563eb; }
+    .flag-cloth-n { background:#dc2626; }
+    @keyframes waveflag {
+      0%,100%{transform:scaleX(1) skewY(0);}
+      30%{transform:scaleX(.92) skewY(-4deg);}
+      70%{transform:scaleX(.95) skewY(3deg);}
+    }
+    /* Troops */
+    .troops-layer { position:absolute; inset:0; pointer-events:none; z-index:4; }
+    .troop { position:absolute; font-size:13px; line-height:1; transition:left .8s ease; }
+    /* Smoke / dust */
+    .dust-layer { position:absolute; inset:0; pointer-events:none; z-index:5; overflow:hidden; }
+    .dust-puff {
+      position:absolute; border-radius:50%;
+      background:rgba(180,140,60,.35);
+      animation:puffUp 1.8s ease-out forwards;
+    }
+    @keyframes puffUp {
+      0%  { transform:scale(.4); opacity:.7; }
+      100%{ transform:scale(2.5) translateY(-20px); opacity:0; }
+    }
+    /* War overlay */
+    .war-overlay {
+      position:absolute; inset:0; z-index:15;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(180,0,0,.25); opacity:0;
+      pointer-events:none; transition:opacity .25s;
+    }
+    .war-overlay.on { opacity:1; }
+    .war-label {
+      font-size:clamp(1.2rem,5vw,1.8rem); font-weight:900;
+      color:#fff; text-shadow:0 0 20px #f59e0b, 0 2px 8px rgba(0,0,0,.8);
+      letter-spacing:.1em;
+    }
+    @keyframes warPulse {
+      0%,100%{transform:scale(1);}
+      50%{transform:scale(1.12);}
+    }
+    .war-label.pulse { animation:warPulse .5s ease infinite; }
+    /* Round result text overlay */
+    .round-result-text {
+      position:absolute; top:6px; left:50%; transform:translateX(-50%);
+      font-size:clamp(.68rem,2.8vw,.82rem); font-weight:800;
+      white-space:nowrap; z-index:12; pointer-events:none;
+      text-shadow:0 1px 4px rgba(0,0,0,.9); transition:opacity .4s;
+    }
+    /* Sparks */
+    .spark {
+      position:absolute; border-radius:50%; pointer-events:none; z-index:14;
+      animation:sparkFly .7s ease-out forwards;
+    }
+    @keyframes sparkFly {
+      0%  { transform:translate(0,0) scale(1); opacity:1; }
+      100%{ transform:translate(var(--sx),var(--sy)) scale(0); opacity:0; }
+    }
+    /* Battlefield info bar */
+    .bf-info-row {
+      display:flex; justify-content:space-between; align-items:center;
+      width:100%; max-width:400px; margin-top:4px;
+      font-size:.7rem; color:var(--text-muted);
+    }
+    .bf-info-row strong { color:var(--text-main); }
+    /* Mini frontline bar */
+    .fl-bar-wrap {
+      width:100%; max-width:400px; height:5px;
+      background:rgba(255,255,255,.08); border-radius:3px; margin-top:3px; overflow:hidden;
+    }
+    .fl-bar-fill {
+      height:100%; background:linear-gradient(90deg,#3b82f6,#60a5fa);
+      border-radius:3px; transition:width .7s ease;
+    }
+
+    /* ---- PLAYER ZONE ---- */
+    .player-zone {
+      flex-shrink:0; padding:4px 12px 10px;
+      display:flex; flex-direction:column; align-items:center; gap:7px;
+    }
+    .player-card-row { display:flex; gap:10px; align-items:center; justify-content:center; }
+    .player-label { font-size:.72rem; color:var(--text-muted); font-weight:600; }
+    .draw-btn-wrap { width:100%; max-width:360px; }
+    .secondary-row { display:flex; gap:8px; width:100%; max-width:360px; justify-content:center; }
+
+    /* ===== END SCREEN ===== */
+    #endScreen {
+      background:rgba(0,0,0,.94); z-index:300; justify-content:center;
+      padding: 24px 20px; gap:10px; overflow-y:auto;
+    }
+    .end-header { text-align:center; }
+    .end-icon { font-size:3rem; display:block; }
+    .end-title {
+      font-size:clamp(1.8rem,9vw,3rem); font-weight:900; text-transform:uppercase;
+      display:block; margin-top:4px;
+    }
+    .end-title.win { color:var(--gold); text-shadow:0 0 30px rgba(251,191,36,.6); }
+    .end-title.loss{ color:#ef4444;  text-shadow:0 0 30px rgba(239,68,68,.6); }
+    @keyframes victoryWobble {
+      0%,100%{transform:translateY(0) rotate(-1deg);}
+      50%{transform:translateY(-6px) rotate(1deg);}
+    }
+    .end-title.win { animation:victoryWobble 1.1s ease-in-out infinite; }
+    .end-stat-box {
+      background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.11);
+      border-radius:12px; padding:14px 22px; width:100%; max-width:300px; text-align:center;
+    }
+    .end-stat-line { font-size:.88rem; color:var(--text-muted); }
+    .end-stat-line strong { color:var(--text-main); font-size:.95rem; }
+    .end-comment {
+      font-style:italic; color:var(--text-muted); font-size:.85rem;
+      max-width:300px; text-align:center; line-height:1.5;
+    }
+    .end-actions { display:flex; flex-direction:column; gap:9px; width:100%; max-width:280px; align-items:center; }
+
+    /* ===== MODAL ===== */
+    .modal-backdrop {
+      position:fixed; inset:0; background:rgba(0,0,0,.72);
+      display:none; align-items:center; justify-content:center; z-index:400; padding:16px;
+    }
+    .modal-backdrop.open { display:flex; }
+    .modal-box {
+      background:#1e293b; border:1px solid rgba(255,255,255,.14);
+      border-radius:14px; padding:24px; max-width:310px; width:100%; text-align:center;
+    }
+    .modal-title { font-size:1rem; font-weight:700; margin-bottom:8px; }
+    .modal-body  { font-size:.82rem; color:var(--text-muted); margin-bottom:16px; line-height:1.5; }
+    .modal-row   { display:flex; gap:10px; justify-content:center; }
+    .modal-row .btn { flex:1; max-width:110px; }
+
+    /* ===== CONFETTI ===== */
+    #confetti-layer { position:fixed; inset:0; pointer-events:none; z-index:500; overflow:hidden; }
+    .confetti-bit {
+      position:absolute; top:-14px;
+      animation:confettiFall linear forwards;
+    }
+    @keyframes confettiFall {
+      to{ transform:translateY(110vh) rotate(900deg); opacity:0; }
+    }
+
+    /* ===== FAST-MODE BADGE ===== */
+    .fast-badge {
+      font-size:.65rem; font-weight:700; color:var(--gold);
+      background:rgba(251,191,36,.15); border-radius:4px;
+      padding:2px 6px; display:none;
+    }
+    .fast-badge.on { display:inline; }
+
+    /* ===== REDUCED MOTION ===== */
+    @media (prefers-reduced-motion:reduce) {
+      *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+    }
+
+    /* ===== LANDSCAPE FIX (small phones) ===== */
+    @media (max-height:520px) {
+      .battlefield { height:80px; }
+      .npc-zone    { padding:4px 10px 2px; gap:4px; }
+      .player-zone { padding:2px 10px 6px; gap:4px; }
+      .btn-lg      { min-height:42px; font-size:.9rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Confetti layer -->
+<div id="confetti-layer"></div>
+
+<!-- ===================== TITLE SCREEN ===================== -->
+<div id="titleScreen" class="screen active">
+  <div class="title-logo-wrap">
+    <span class="title-deco">⚔️</span>
+    <span class="title-logo">Frontline War</span>
+    <span class="title-sub">Classic War, battlefield style.</span>
+  </div>
+  <div class="title-instructions">
+    <strong>Draw cards. Win rounds. Push the frontline.</strong><br>
+    Higher rank wins the cards. Ace is highest.<br>
+    Ties trigger a dramatic <strong>WAR</strong> showdown.<br>
+    Capture all 52 cards to win the war.
+  </div>
+  <div class="title-buttons">
+    <button class="btn btn-gold btn-block btn-lg" onclick="titleStartRandom()">⚔️ Start Game</button>
+    <button class="btn btn-blue  btn-block"       onclick="openPicker(false)">👥 Choose Opponent</button>
+    <button class="btn btn-slate btn-block btn-sm" onclick="showResetModal()">
+      Reset Stats &nbsp;<span id="titleStatsLabel" style="font-weight:400;opacity:.7"></span>
+    </button>
+  </div>
+  <div class="title-stat-bar">
+    <div>🏆 Wins: <b id="titleWins">0</b></div>
+    <div>💀 Losses: <b id="titleLosses">0</b></div>
+  </div>
+</div>
+
+<!-- ===================== OPPONENT PICKER ===================== -->
+<div id="opponentPicker" class="screen">
+  <div class="picker-head">Choose Your Opponent</div>
+  <div class="picker-sub">Select a commander — or we'll pick for you.</div>
+  <div class="opp-grid" id="oppGrid"></div>
+  <div class="picker-actions">
+    <button class="btn btn-gold btn-block" onclick="confirmPick()">⚔️ Start Battle!</button>
+    <button class="btn btn-slate btn-block btn-sm" onclick="cancelPick()">Cancel</button>
+  </div>
+</div>
+
+<!-- ===================== GAME SCREEN ===================== -->
+<div id="gameScreen" class="screen">
+  <!-- Header -->
+  <div class="g-header">
+    <div class="g-header-title">⚔️ FRONTLINE</div>
+    <div class="g-header-stats">
+      <div class="g-stat"><span class="g-stat-val" id="hWins">0</span>Wins</div>
+      <div class="g-stat"><span class="g-stat-val" id="hLoss">0</span>Losses</div>
+    </div>
+    <div class="g-header-btns">
+      <span class="fast-badge" id="fastBadge">FAST</span>
+      <button class="btn btn-slate btn-xs" id="muteBtn" onclick="toggleMute()" aria-label="Toggle sound">🔇</button>
+      <button class="btn btn-slate btn-xs" onclick="showResetModal()" title="Reset lifetime stats" aria-label="Reset stats">↺</button>
+    </div>
+  </div>
+
+  <div class="g-body">
+    <!-- NPC Zone -->
+    <div class="npc-zone">
+      <div class="npc-info-row">
+        <div class="npc-avatar" id="npcAvatar"></div>
+        <div class="npc-meta">
+          <div class="npc-name-line" id="npcName">Opponent</div>
+          <div class="npc-cards-line">Cards: <span id="npcCount">26</span></div>
+        </div>
+        <div class="taunt-bubble" id="tauntBubble">…</div>
+      </div>
+      <div class="npc-card-row">
+        <div class="card-deck-visual" id="npcDeckVis"><span id="npcDeckN">26</span></div>
+        <div class="card-slot" id="npcSlot"></div>
+      </div>
+    </div>
+
+    <!-- Battlefield Zone -->
+    <div class="bf-zone">
+      <div class="suspense-text" id="suspenseText"></div>
+
+      <div class="battlefield" id="battlefield">
+        <div class="bf-sky"></div>
+        <div class="bf-terrain"></div>
+        <div class="bf-p-half" id="bfPHalf"></div>
+        <div class="bf-n-half" id="bfNHalf"></div>
+
+        <!-- Flags -->
+        <div class="bf-flag bf-flag-p">
+          <div class="flag-cloth flag-cloth-p" id="playerFlag"></div>
+          <div class="flag-pole"></div>
+        </div>
+        <div class="bf-flag bf-flag-n">
+          <div class="flag-cloth flag-cloth-n" id="npcFlag" style="animation-delay:.4s"></div>
+          <div class="flag-pole"></div>
+        </div>
+
+        <!-- Troops -->
+        <div class="troops-layer" id="troopsLayer"></div>
+
+        <!-- Dust -->
+        <div class="dust-layer" id="dustLayer"></div>
+
+        <!-- Frontline -->
+        <div class="frontline" id="frontline">
+          <div class="frontline-gem"></div>
+        </div>
+
+        <!-- War overlay -->
+        <div class="war-overlay" id="warOverlay">
+          <div class="war-label" id="warLabel">WAR!</div>
+        </div>
+
+        <!-- Round result -->
+        <div class="round-result-text" id="rrText"></div>
+      </div>
+
+      <div class="bf-info-row">
+        <div>You: <strong id="pCardCount">26</strong></div>
+        <div>Round <strong id="roundNum">0</strong></div>
+        <div>Opp: <strong id="nCardCount">26</strong></div>
+      </div>
+      <div class="fl-bar-wrap"><div class="fl-bar-fill" id="flBarFill" style="width:50%"></div></div>
+    </div>
+
+    <!-- Player Zone -->
+    <div class="player-zone">
+      <div class="player-card-row">
+        <div class="card-slot" id="playerSlot"></div>
+        <div class="card-deck-visual" id="playerDeckVis"><span id="playerDeckN">26</span></div>
+      </div>
+      <div class="player-label">YOU</div>
+      <div class="draw-btn-wrap">
+        <button class="btn btn-gold btn-block btn-lg" id="drawBtn" onclick="onDraw()">⚔️ Draw Cards</button>
+      </div>
+      <div class="secondary-row">
+        <button class="btn btn-slate btn-sm" onclick="toggleFast()">⚡ Fast</button>
+        <button class="btn btn-slate btn-sm" onclick="confirmRestart()">↺ Restart</button>
+        <button class="btn btn-slate btn-sm" onclick="confirmQuit()">🏠 Quit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== END SCREEN ===================== -->
+<div id="endScreen" class="screen">
+  <div class="end-header">
+    <span class="end-icon" id="endIcon">🏆</span>
+    <span class="end-title" id="endTitle">Victory!</span>
+  </div>
+  <div class="end-stat-box">
+    <div class="end-stat-line">You <strong id="endPlayerCards">52</strong> — <strong id="endNpcCards">0</strong> Opponent</div>
+    <div class="end-stat-line" style="margin-top:6px">Rounds played: <strong id="endRounds">0</strong></div>
+    <div class="end-stat-line" style="margin-top:4px">vs. <strong id="endOppName">Opponent</strong></div>
+  </div>
+  <div class="end-comment" id="endComment"></div>
+  <div class="end-actions">
+    <button class="btn btn-gold  btn-block btn-lg" onclick="playAgain()">⚔️ Play Again</button>
+    <button class="btn btn-blue  btn-block"        onclick="newOpponent()">👥 New Opponent</button>
+    <button class="btn btn-slate btn-block btn-sm" onclick="toTitle()">🏠 Quit to Title</button>
+  </div>
+</div>
+
+<!-- ===================== MODAL ===================== -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">Confirm</div>
+    <div class="modal-body"  id="modalBody"></div>
+    <div class="modal-row">
+      <button class="btn btn-red  btn-sm" id="modalYes">Yes</button>
+      <button class="btn btn-slate btn-sm" onclick="closeModal()">No</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCRIPT ===================== -->
+<script>
+'use strict';
+
+/* ================================================================
+   DATA
+   ================================================================ */
+
+const SUITS  = ['♠','♣','♥','♦'];
+const RANKS  = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const VALUES = {2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13,A:14};
+const RED_S  = new Set(['♥','♦']);
+
+const OPPONENTS = [
+  {
+    id:'brass', name:'Captain Brass', style:'Overconfident commander',
+    emoji:'🎖️', bg:'linear-gradient(135deg,#92400e,#78350f)', color:'#b45309',
+    npcFlagColor:'#b45309',
+    taunts:{
+      start:       "I've won every battle since '43. Don't waste my time.",
+      npcWins:    ["Retreat while you can!","Outflanked again!","Textbook victory, soldier!","Fall back, recruit!"],
+      playerWins: ["A lucky shot. Nothing more.","Enjoy it while you can.","Even my boots have beaten better."],
+      warStart:   ["WAR? I eat wars for breakfast.","Now we're talking, recruit."],
+      npcWinsWar: ["The battlefield is MINE!","Superior tactics, as expected!"],
+      playerWinsWar:["...Regroup. REGROUP!","This isn't over, soldier!"],
+      npcWinsGame: "VICTORY! Add it to the trophy case. DISMISSED.",
+      playerWinsGame:"Beginner's luck. Request a rematch, soldier."
+    }
+  },
+  {
+    id:'vex', name:'Lady Vex', style:'Elegant royal strategist',
+    emoji:'👑', bg:'linear-gradient(135deg,#6d28d9,#4c1d95)', color:'#7c3aed',
+    npcFlagColor:'#7c3aed',
+    taunts:{
+      start:       "How… quaint. Shall we make this quick?",
+      npcWins:    ["Predictable.","As expected.","My court jesters play better.","How dreadfully boring."],
+      playerWins: ["A fluke. Do carry on.","Even peasants get lucky.","Don't mistake fortune for skill."],
+      warStart:   ["Oh, a duel? How delightfully primitive.","Very well. Let us settle this."],
+      npcWinsWar: ["Your fate was written long ago.","The crown prevails. Always."],
+      playerWinsWar:["…Tolerable. For now.","Don't look so pleased with yourself."],
+      npcWinsGame: "Magnificent. Now go away.",
+      playerWinsGame:"You won the battle. The war, in spirit, is still mine."
+    }
+  },
+  {
+    id:'rusty', name:'Rusty McGraw', style:'Dusty saloon card shark',
+    emoji:'🤠', bg:'linear-gradient(135deg,#78350f,#451a03)', color:'#92400e',
+    npcFlagColor:'#92400e',
+    taunts:{
+      start:       "Howdy, pardner. Hope ya brought spare boots.",
+      npcWins:    ["Yeehaw!","That's frontier justice!","Drier than a tumbleweed, pardner!","Slicker than a greased coyote!"],
+      playerWins: ["Well I'll be a rattlesnake's uncle.","You got spurs on those cards?","Don't get comfy, cowpoke."],
+      warStart:   ["High noon, partner. Draw.","This here's a duel, not a duel-ette."],
+      npcWinsWar: ["Ride off into the sunset!","Fastest draw in the frontier!"],
+      playerWinsWar:["*spits tobacco* Lucky.","My horse plays better'n that."],
+      npcWinsGame: "Yee-HAW! Gonna need a bigger hat!",
+      playerWinsGame:"You whipped me fair and square, cowpoke. I respect that."
+    }
+  },
+  {
+    id:'byte', name:'Byte Baron', style:'Tactical AI unit',
+    emoji:'🤖', bg:'linear-gradient(135deg,#0e7490,#155e75)', color:'#0891b2',
+    npcFlagColor:'#0891b2',
+    taunts:{
+      start:       "INITIALIZING… Win probability: 94.7%. Commencing domination.",
+      npcWins:    ["OPTIMAL OUTCOME.","EFFICIENCY: 100%.","ERROR 404: Your win not found.","PROCESSING… Victory confirmed."],
+      playerWins: ["ANOMALY DETECTED.","RECALCULATING…","Updating threat level: MINOR."],
+      warStart:   ["COMBAT PROTOCOL v7.3 ACTIVE.","DANGER LEVEL: ELEVATED. Adjusting."],
+      npcWinsWar: ["SUPERIOR PROCESSING SPEED.","VICTORY SUBROUTINE COMPLETE."],
+      playerWinsWar:["UNEXPECTED INPUT. ADAPTING.","LOGGING ERROR. Will not repeat."],
+      npcWinsGame: "SIMULATION COMPLETE. RESULT: EXPECTED.",
+      playerWinsGame:"RECALIBRATING… You are… acceptable."
+    }
+  },
+  {
+    id:'goblin', name:'Goblin Nick', style:'Chaotic trash-talker',
+    emoji:'👺', bg:'linear-gradient(135deg,#166534,#14532d)', color:'#16a34a',
+    npcFlagColor:'#16a34a',
+    taunts:{
+      start:       "HEHEHEHE! Goblin smash your deck to DUST!",
+      npcWins:    ["MINE MINE MINE!","Goblin WIN again!","You stink like old cards!","Trash tier human!"],
+      playerWins: ["NO FAIR! You cheated!","Goblin was distracted by shiny thing!","That one doesn't count!!"],
+      warStart:   ["OOOOH WAR! Goblin LOVES chaos!","HEHEHEHE THIS IS GOBLIN'S MOMENT!"],
+      npcWinsWar: ["GOBLIN SMASH! GOBLIN WIN! AAAGHHH!","Did you see that?! DID YOU?!"],
+      playerWinsWar:["*goblin tantrum noises*","GOBLIN DEMANDS A REMATCH!"],
+      npcWinsGame: "HAHAHAHAHA! GOBLIN UNSTOPPABLE!",
+      playerWinsGame:"…Goblin let you win. On purpose. Obviously."
+    }
+  },
+  {
+    id:'crow', name:'Madame Crow', style:'Mystic fortune-teller',
+    emoji:'🔮', bg:'linear-gradient(135deg,#7e22ce,#4a044e)', color:'#9333ea',
+    npcFlagColor:'#9333ea',
+    taunts:{
+      start:       "I have seen your fate in the cards. It is… unfortunate.",
+      npcWins:    ["The stars foretold this.","Destiny does not negotiate.","The cards never lie.","Your aura dims further…"],
+      playerWins: ["A turbulence in my vision…","The cards shift unexpectedly.","Even fate can stumble."],
+      warStart:   ["The veil grows thin… WAR is near.","I see blood… and cards."],
+      npcWinsWar: ["The prophecy is fulfilled.","As the crow flies, so falls your hope."],
+      playerWinsWar:["…I must consult the spirits again.","The cosmos corrects itself."],
+      npcWinsGame: "Your fate was sealed before the first card was drawn.",
+      playerWinsGame:"Well played. Perhaps I misread the entrails."
+    }
+  }
+];
+
+/* ================================================================
+   GAME STATE
+   ================================================================ */
+let G = {
+  playerDeck: [],
+  npcDeck:    [],
+  round:      0,
+  frontline:  0,      // -100 (NPC winning) … 0 … +100 (player winning)
+  opp:        null,
+  busy:       false,
+  fast:       false,
+  muted:      true,
+};
+
+let STATS = { wins: 0, losses: 0 };
+let pickerFromEnd   = false;
+let pickerSelected  = null;
+
+/* ================================================================
+   AUDIO — Web Audio API, default muted
+   ================================================================ */
+let _actx = null;
+function actx() {
+  if (!_actx) _actx = new (window.AudioContext || window.webkitAudioContext)();
+  return _actx;
+}
+function tone(freq, dur, type='sine', vol=.25) {
+  if (G.muted) return;
+  try {
+    const ctx = actx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = type; o.frequency.setValueAtTime(freq, ctx.currentTime);
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + dur);
+    o.start(); o.stop(ctx.currentTime + dur);
+  } catch(e){}
+}
+const sfx = {
+  flip:    ()=>{ tone(320,.09,'triangle'); },
+  win:     ()=>{ tone(523,.13); setTimeout(()=>tone(659,.13),130); setTimeout(()=>tone(784,.22),260); },
+  lose:    ()=>{ tone(220,.35,'sawtooth',.2); },
+  war:     ()=>{ [80,90,100,80].forEach((f,i)=>setTimeout(()=>tone(f,.14,'square',.28),i*160)); },
+  victory: ()=>{ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.22),i*110)); },
+  defeat:  ()=>{ [280,240,200,160].forEach((f,i)=>setTimeout(()=>tone(f,.28,'sawtooth',.18),i*140)); },
+};
+function toggleMute() {
+  G.muted = !G.muted;
+  document.getElementById('muteBtn').textContent = G.muted ? '🔇' : '🔊';
+}
+
+/* ================================================================
+   STATS
+   ================================================================ */
+function loadStats() {
+  try { const s = localStorage.getItem('flwStats'); if (s) STATS = JSON.parse(s); } catch(e){}
+  renderStats();
+}
+function saveStats() {
+  try { localStorage.setItem('flwStats', JSON.stringify(STATS)); } catch(e){}
+  renderStats();
+}
+function renderStats() {
+  document.getElementById('titleWins').textContent   = STATS.wins;
+  document.getElementById('titleLosses').textContent = STATS.losses;
+  document.getElementById('titleStatsLabel').textContent = `(W:${STATS.wins} L:${STATS.losses})`;
+  document.getElementById('hWins').textContent = STATS.wins;
+  document.getElementById('hLoss').textContent = STATS.losses;
+}
+
+/* ================================================================
+   DECK
+   ================================================================ */
+function createDeck() {
+  const d = [];
+  for (const s of SUITS)
+    for (const r of RANKS)
+      d.push({ suit:s, rank:r, value:VALUES[r], color: RED_S.has(s)?'red':'dark' });
+  return d;
+}
+function shuffle(arr) {
+  for (let i = arr.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr;
+}
+/* Gameplay-friendly light shuffle: only shuffles the back half of won cards
+   so the game doesn't lock into endless loops but also feels fair. */
+function lightShuffle(arr) {
+  const half = Math.floor(arr.length/2);
+  for (let i = arr.length-1; i > half; i--) {
+    const j = half + Math.floor(Math.random()*(i-half+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr;
+}
+
+/* ================================================================
+   CARD RENDERING
+   ================================================================ */
+function makeCardEl(card, faceDown=false) {
+  const el = document.createElement('div');
+  el.className = 'playing-card ' + (faceDown ? 'face-down' : `face-up ${card.color}`);
+  if (!faceDown) {
+    const rk = document.createElement('div'); rk.className='card-rank'; rk.textContent=card.rank;
+    const su = document.createElement('div'); su.className='card-suit'; su.textContent=card.suit;
+    el.appendChild(rk); el.appendChild(su);
+  }
+  return el;
+}
+function showCard(slotId, card, faceDown=false, animate=true) {
+  const slot = document.getElementById(slotId);
+  if (!slot) return null;
+  slot.innerHTML = '';
+  if (!card) return null;
+  const el = makeCardEl(card, faceDown);
+  if (animate) el.classList.add('anim-flip');
+  slot.appendChild(el);
+  if (animate) setTimeout(()=>el.classList.remove('anim-flip'), 400);
+  return el;
+}
+function clearSlot(id) { const s=document.getElementById(id); if(s) s.innerHTML=''; }
+
+/* ================================================================
+   DECK VISUALS
+   ================================================================ */
+function refreshDecks() {
+  const p = G.playerDeck.length, n = G.npcDeck.length;
+  document.getElementById('npcCount').textContent     = n;
+  document.getElementById('npcDeckN').textContent     = n;
+  document.getElementById('pCardCount').textContent   = p;
+  document.getElementById('nCardCount').textContent   = n;
+  document.getElementById('playerDeckN').textContent  = p;
+  document.getElementById('npcDeckVis').classList.toggle('empty', n===0);
+  document.getElementById('playerDeckVis').classList.toggle('empty', p===0);
+}
+
+/* ================================================================
+   BATTLEFIELD
+   ================================================================ */
+function moveFrontline(result) {
+  let delta = 0;
+  if      (result==='player')    delta =  7 + Math.random()*3;
+  else if (result==='npc')       delta = -(7 + Math.random()*3);
+  else if (result==='playerWar') delta =  14 + Math.random()*2;
+  else if (result==='npcWar')    delta = -(14 + Math.random()*2);
+
+  // Gentle bias from card counts so the bar reflects reality
+  const tot = G.playerDeck.length + G.npcDeck.length;
+  if (tot > 0) {
+    const bias = ((G.playerDeck.length / tot) - .5) * 12;
+    delta += bias * .25;
+  }
+  G.frontline = Math.max(-100, Math.min(100, G.frontline + delta));
+  renderFrontline();
+}
+function renderFrontline() {
+  const pct = (G.frontline + 100) / 2;           // 0..100
+  document.getElementById('frontline').style.left  = pct + '%';
+  document.getElementById('bfPHalf').style.width   = pct + '%';
+  document.getElementById('bfNHalf').style.width   = (100-pct) + '%';
+  document.getElementById('flBarFill').style.width = pct + '%';
+}
+function shakeFrontline() {
+  const fl = document.getElementById('frontline');
+  fl.classList.remove('shake');
+  void fl.offsetWidth;
+  fl.classList.add('shake');
+  setTimeout(()=>fl.classList.remove('shake'), 650);
+}
+function spawnDust(side) {
+  const layer = document.getElementById('dustLayer');
+  for (let i=0; i<4; i++) {
+    const d = document.createElement('div');
+    d.className='dust-puff';
+    const xBase = side==='right' ? 38+Math.random()*20 : 42+Math.random()*18;
+    d.style.width = d.style.height = (12+Math.random()*12)+'px';
+    d.style.left  = xBase+'%';
+    d.style.top   = (25+Math.random()*50)+'%';
+    d.style.animationDelay = (i*.12)+'s';
+    layer.appendChild(d);
+    setTimeout(()=>d.remove(), 2400);
+  }
+}
+function spawnSparks(side) {
+  const bf = document.getElementById('battlefield');
+  const colors=['#fbbf24','#f59e0b','#ef4444','#fff','#fde68a'];
+  for (let i=0; i<8; i++) {
+    const sp = document.createElement('div');
+    sp.className='spark';
+    const x = side==='right' ? 35+Math.random()*20 : 45+Math.random()*20;
+    sp.style.cssText=`
+      width:5px;height:5px;left:${x}%;top:${20+Math.random()*60}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+    `;
+    const ang  = Math.random()*Math.PI*2;
+    const dist = 18+Math.random()*28;
+    sp.style.setProperty('--sx', (Math.cos(ang)*dist)+'px');
+    sp.style.setProperty('--sy', (Math.sin(ang)*dist)+'px');
+    bf.appendChild(sp);
+    setTimeout(()=>sp.remove(), 800);
+  }
+}
+function renderTroops() {
+  const layer = document.getElementById('troopsLayer');
+  layer.innerHTML='';
+  const p = G.playerDeck.length, n = G.npcDeck.length;
+  const tot = p+n; if (!tot) return;
+  const pT = Math.max(1, Math.round((p/tot)*5));
+  const nT = Math.max(1, Math.round((n/tot)*5));
+  const flPct = (G.frontline+100)/2;
+  const pEmoj = ['🪖','⚔️','🛡️','💪','🎖️'];
+  const nEmoj = ['💀','🔥','😈','👿','⚡'];
+  for (let i=0; i<pT; i++) {
+    const t=document.createElement('div'); t.className='troop';
+    t.textContent=pEmoj[i%pEmoj.length];
+    t.style.left=(4 + i*(flPct*.14))+'%';
+    t.style.top =(22+Math.sin(i*1.8)*22+22)+'%';
+    layer.appendChild(t);
+  }
+  for (let i=0; i<nT; i++) {
+    const t=document.createElement('div'); t.className='troop';
+    t.textContent=nEmoj[i%nEmoj.length];
+    t.style.left=(96 - i*((100-flPct)*.14))+'%';
+    t.style.top =(22+Math.sin(i*2.1+1)*22+22)+'%';
+    layer.appendChild(t);
+  }
+}
+
+/* ================================================================
+   TAUNTS
+   ================================================================ */
+function taunt(type) {
+  const tbl = G.opp?.taunts;
+  if (!tbl) return;
+  let txt = typeof tbl[type]==='string' ? tbl[type]
+            : Array.isArray(tbl[type])  ? tbl[type][Math.floor(Math.random()*tbl[type].length)]
+            : '';
+  if (!txt) return;
+  const bubble = document.getElementById('tauntBubble');
+  bubble.style.opacity='0';
+  setTimeout(()=>{ bubble.textContent=txt; bubble.style.opacity='1'; }, 220);
+}
+
+/* ================================================================
+   ROUND RESULT TEXT
+   ================================================================ */
+let _rrTimer=null;
+function roundResult(txt, color='#fbbf24') {
+  clearTimeout(_rrTimer);
+  const el=document.getElementById('rrText');
+  el.textContent=txt; el.style.color=color; el.style.opacity='1';
+  _rrTimer=setTimeout(()=>{ el.style.opacity='0'; },2200);
+}
+function setSuspense(txt) { document.getElementById('suspenseText').textContent=txt; }
+
+/* ================================================================
+   GAME INIT
+   ================================================================ */
+function startGame(oppId) {
+  const opp = OPPONENTS.find(o=>o.id===oppId) || OPPONENTS[Math.floor(Math.random()*OPPONENTS.length)];
+  G.opp = opp;
+  const deck = shuffle(createDeck());
+  G.playerDeck = deck.slice(0,26);
+  G.npcDeck    = deck.slice(26);
+  G.round      = 0;
+  G.frontline  = 0;
+  G.busy       = false;
+
+  // Apply opponent NPC flag color
+  document.getElementById('npcFlag').style.background = opp.npcFlagColor;
+
+  // Render avatar
+  const av = document.getElementById('npcAvatar');
+  av.textContent = opp.emoji;
+  av.style.background = opp.bg;
+  document.getElementById('npcName').textContent = opp.name;
+
+  // Reset UI
+  clearSlot('npcSlot'); clearSlot('playerSlot');
+  document.getElementById('rrText').textContent      = '';
+  document.getElementById('suspenseText').textContent= '';
+  document.getElementById('roundNum').textContent    = '0';
+  document.getElementById('warOverlay').classList.remove('on');
+  setDrawBtn(true);
+  refreshDecks();
+  renderFrontline();
+  renderTroops();
+  taunt('start');
+  showScreen('gameScreen');
+}
+
+/* ================================================================
+   DRAW BUTTON
+   ================================================================ */
+function setDrawBtn(enabled) {
+  const b=document.getElementById('drawBtn');
+  b.disabled=!enabled;
+}
+function onDraw() {
+  if (G.busy) return;
+  drawRound();
+}
+
+/* ================================================================
+   MAIN ROUND
+   ================================================================ */
+async function drawRound() {
+  if (!G.playerDeck.length || !G.npcDeck.length) {
+    endGame(G.playerDeck.length>0?'player':'npc'); return;
+  }
+  G.busy=true; setDrawBtn(false);
+  G.round++;
+  document.getElementById('roundNum').textContent=G.round;
+
+  const pCard = G.playerDeck.shift();
+  const nCard = G.npcDeck.shift();
+
+  sfx.flip();
+  showCard('npcSlot',    nCard, true,  true);
+  showCard('playerSlot', pCard, false, true);
+  await ms(G.fast?120:380);
+
+  // Flip NPC card
+  sfx.flip();
+  showCard('npcSlot', nCard, false, true);
+  await ms(G.fast?100:320);
+
+  await resolveBattle(pCard, nCard, [pCard, nCard]);
+}
+
+/* ================================================================
+   RESOLVE
+   ================================================================ */
+async function resolveBattle(pCard, nCard, pile) {
+  const d = G.fast?80:320;
+
+  if (pCard.value > nCard.value) {
+    roundResult('You win the round!','#4ade80');
+    taunt('playerWins'); sfx.win();
+    animCard('playerSlot','anim-win','glow-win');
+    animCard('npcSlot',   'anim-lose','dim-lose');
+    await ms(G.fast?280:650);
+    moveFrontline('player'); spawnSparks('right'); spawnDust('right');
+    lightShuffle(pile); G.playerDeck.push(...pile);
+
+  } else if (nCard.value > pCard.value) {
+    roundResult('Opponent wins!','#f87171');
+    taunt('npcWins'); sfx.lose();
+    animCard('npcSlot',   'anim-win','glow-win');
+    animCard('playerSlot','anim-lose','dim-lose');
+    await ms(G.fast?280:650);
+    moveFrontline('npc'); spawnSparks('left'); spawnDust('left');
+    lightShuffle(pile); G.npcDeck.push(...pile);
+
+  } else {
+    await handleWar(pile);
+  }
+
+  refreshDecks(); renderTroops();
+  clearSlot('playerSlot'); clearSlot('npcSlot');
+  setSuspense('');
+
+  if (!G.playerDeck.length) { await ms(300); endGame('npc');    return; }
+  if (!G.npcDeck.length)    { await ms(300); endGame('player'); return; }
+  G.busy=false; setDrawBtn(true);
+}
+
+function animCard(slotId, animCls, stateCls) {
+  const el = document.querySelector(`#${slotId} .playing-card`);
+  if (!el) return;
+  if (animCls)  { el.classList.add(animCls);  setTimeout(()=>el.classList.remove(animCls),600); }
+  if (stateCls) el.classList.add(stateCls);
+}
+
+/* ================================================================
+   WAR SEQUENCE
+   ================================================================ */
+async function handleWar(pile) {
+  const d   = G.fast?80:350;
+  const dSh = G.fast?50:180;
+
+  const warOverlay = document.getElementById('warOverlay');
+  const warLabel   = document.getElementById('warLabel');
+
+  warOverlay.classList.add('on');
+  warLabel.textContent='WAR!';
+  warLabel.classList.add('pulse');
+  shakeFrontline(); sfx.war();
+  roundResult('WAR!','#fbbf24');
+  taunt('warStart');
+  setSuspense('⚔️ WAR! ⚔️');
+
+  await ms(G.fast?350:800);
+
+  // — 3 face-down cards each side —
+  setSuspense('Three cards down…');
+  const pDown=[]; const nDown=[];
+  for (let i=0; i<3; i++) {
+    await ms(dSh);
+    if (G.playerDeck.length) pDown.push(G.playerDeck.shift());
+    if (G.npcDeck.length)    nDown.push(G.npcDeck.shift());
+  }
+  pile.push(...pDown, ...nDown);
+
+  showCard('playerSlot', pDown[pDown.length-1]||null, true, true);
+  showCard('npcSlot',    nDown[nDown.length-1]||null, true, true);
+  await ms(d);
+
+  warLabel.classList.remove('pulse');
+  warOverlay.classList.remove('on');
+
+  // Edge cases: no cards left for showdown
+  if (!G.playerDeck.length && !G.npcDeck.length) {
+    setSuspense('Both sides exhausted!'); roundResult('Both exhausted — draw','#fbbf24');
+    const half=Math.floor(pile.length/2);
+    lightShuffle(pile);
+    G.playerDeck.push(...pile.slice(0,half));
+    G.npcDeck.push(...pile.slice(half));
+    return;
+  }
+  if (!G.playerDeck.length) {
+    setSuspense('You were overrun!');
+    roundResult('You were overrun!','#f87171'); taunt('npcWinsWar'); sfx.lose();
+    moveFrontline('npcWar'); spawnSparks('left'); spawnDust('left');
+    lightShuffle(pile); G.npcDeck.push(...pile);
+    await ms(d); return;
+  }
+  if (!G.npcDeck.length) {
+    setSuspense('Enemy overrun!');
+    roundResult('You won the showdown!','#4ade80'); taunt('playerWinsWar'); sfx.win();
+    moveFrontline('playerWar'); spawnSparks('right'); spawnDust('right');
+    lightShuffle(pile); G.playerDeck.push(...pile);
+    await ms(d); return;
+  }
+
+  // — Showdown flip —
+  warLabel.textContent='SHOWDOWN!'; warLabel.classList.add('pulse');
+  warOverlay.classList.add('on');
+  setSuspense('Showdown!');
+  await ms(dSh*2);
+  warLabel.classList.remove('pulse');
+  warOverlay.classList.remove('on');
+
+  const pSh = G.playerDeck.shift();
+  const nSh = G.npcDeck.shift();
+  pile.push(pSh, nSh);
+
+  sfx.flip();
+  showCard('playerSlot', pSh, false, true);
+  showCard('npcSlot',    nSh, true,  true);
+  await ms(dSh*2);
+  sfx.flip();
+  showCard('npcSlot', nSh, false, true);
+  await ms(G.fast?250:700);
+
+  // Resolve showdown
+  if (pSh.value > nSh.value) {
+    roundResult('You won the showdown!','#4ade80'); taunt('playerWinsWar'); sfx.win();
+    animCard('playerSlot','anim-win','glow-win');
+    animCard('npcSlot','anim-lose','dim-lose');
+    await ms(G.fast?280:650);
+    moveFrontline('playerWar'); spawnSparks('right'); spawnDust('right');
+    lightShuffle(pile); G.playerDeck.push(...pile);
+    await ms(d);
+
+  } else if (nSh.value > pSh.value) {
+    roundResult('You were overrun!','#f87171'); taunt('npcWinsWar'); sfx.lose();
+    animCard('npcSlot','anim-win','glow-win');
+    animCard('playerSlot','anim-lose','dim-lose');
+    await ms(G.fast?280:650);
+    moveFrontline('npcWar'); spawnSparks('left'); spawnDust('left');
+    lightShuffle(pile); G.npcDeck.push(...pile);
+    await ms(d);
+
+  } else {
+    // Another tie — recurse
+    setSuspense('Tied again!');
+    await ms(G.fast?180:450);
+    await handleWar(pile);
+  }
+}
+
+/* ================================================================
+   END GAME
+   ================================================================ */
+function endGame(winner) {
+  G.busy=true; setDrawBtn(false);
+  const win = winner==='player';
+  if (win) { STATS.wins++;   sfx.victory(); spawnConfetti(); }
+  else     { STATS.losses++; sfx.defeat();  }
+  saveStats();
+  taunt(win ? 'playerWinsGame' : 'npcWinsGame');
+
+  document.getElementById('endIcon').textContent  = win ? '🏆' : '💀';
+  document.getElementById('endTitle').textContent = win ? 'Victory!' : 'Defeat!';
+  document.getElementById('endTitle').className   = 'end-title ' + (win?'win':'loss');
+  document.getElementById('endPlayerCards').textContent = G.playerDeck.length;
+  document.getElementById('endNpcCards').textContent    = G.npcDeck.length;
+  document.getElementById('endRounds').textContent      = G.round;
+  document.getElementById('endOppName').textContent     = G.opp?.name||'Opponent';
+  const comment = G.opp?.taunts[win?'playerWinsGame':'npcWinsGame']||'';
+  document.getElementById('endComment').textContent = comment ? `"${comment}"` : '';
+  showScreen('endScreen');
+}
+
+/* ================================================================
+   CONFETTI
+   ================================================================ */
+function spawnConfetti() {
+  const layer=document.getElementById('confetti-layer');
+  const colors=['#fbbf24','#4ade80','#60a5fa','#f472b6','#a78bfa','#34d399','#fb7185'];
+  for(let i=0;i<70;i++){
+    const p=document.createElement('div');
+    p.className='confetti-bit';
+    const sz=6+Math.random()*9;
+    p.style.cssText=`
+      left:${Math.random()*100}vw;
+      width:${sz}px; height:${sz}px;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      border-radius:${Math.random()>.5?'50%':'3px'};
+      animation-duration:${1.4+Math.random()*2}s;
+      animation-delay:${Math.random()*1.4}s;
+      opacity:.9;
+    `;
+    layer.appendChild(p);
+    setTimeout(()=>p.remove(), 5000);
+  }
+}
+
+/* ================================================================
+   SCREEN MANAGEMENT
+   ================================================================ */
+function showScreen(id) {
+  ['titleScreen','opponentPicker','gameScreen','endScreen'].forEach(sid=>{
+    const el=document.getElementById(sid);
+    el.classList.toggle('active', sid===id);
+  });
+}
+
+/* ================================================================
+   OPPONENT PICKER
+   ================================================================ */
+function buildGrid() {
+  const grid=document.getElementById('oppGrid');
+  grid.innerHTML='';
+  OPPONENTS.forEach(opp=>{
+    const tile=document.createElement('div');
+    tile.className='opp-tile';
+    tile.dataset.id=opp.id;
+    tile.innerHTML=`
+      <div class="opp-avatar-ring" style="background:${opp.bg}">${opp.emoji}</div>
+      <div class="opp-tile-name">${opp.name}</div>
+      <div class="opp-tile-style">${opp.style}</div>
+    `;
+    tile.onclick=()=>selectOpp(opp.id);
+    grid.appendChild(tile);
+  });
+}
+function selectOpp(id) {
+  pickerSelected=id;
+  document.querySelectorAll('.opp-tile').forEach(t=>t.classList.toggle('selected',t.dataset.id===id));
+}
+function openPicker(fromEnd=false) {
+  pickerFromEnd=fromEnd;
+  pickerSelected=null;
+  buildGrid();
+  showScreen('opponentPicker');
+}
+function cancelPick() {
+  showScreen(pickerFromEnd?'endScreen':'titleScreen');
+}
+function confirmPick() {
+  const id = pickerSelected || OPPONENTS[Math.floor(Math.random()*OPPONENTS.length)].id;
+  startGame(id);
+}
+
+/* ================================================================
+   TITLE / END ACTIONS
+   ================================================================ */
+function titleStartRandom() {
+  startGame(OPPONENTS[Math.floor(Math.random()*OPPONENTS.length)].id);
+}
+function playAgain()  { startGame(G.opp?.id || OPPONENTS[0].id); }
+function newOpponent(){ openPicker(true); }
+function toTitle()    { showScreen('titleScreen'); }
+
+/* ================================================================
+   IN-GAME ACTIONS
+   ================================================================ */
+function toggleFast() {
+  G.fast=!G.fast;
+  document.querySelector('[onclick="toggleFast()"]').textContent = G.fast?'⚡ Fast: ON':'⚡ Fast';
+  document.getElementById('fastBadge').classList.toggle('on', G.fast);
+}
+function confirmRestart() {
+  modal('Restart Game?','Current progress will be lost.',()=>startGame(G.opp?.id||OPPONENTS[0].id));
+}
+function confirmQuit() {
+  modal('Quit to Title?','Current game will end.',()=>toTitle());
+}
+
+/* ================================================================
+   MODAL
+   ================================================================ */
+function modal(title, body, onYes) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').textContent  = body;
+  document.getElementById('modalYes').onclick = ()=>{ closeModal(); onYes(); };
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function showResetModal() {
+  modal(
+    'Reset Lifetime Stats?',
+    'This will permanently clear all wins and losses.',
+    ()=>{ STATS={wins:0,losses:0}; saveStats(); }
+  );
+}
+
+/* ================================================================
+   UTILITY
+   ================================================================ */
+function ms(n) { return new Promise(r=>setTimeout(r,n)); }
+
+/* ================================================================
+   BOOT
+   ================================================================ */
+loadStats();
+</script>
+</body>
+</html>
