@@ -193,6 +193,7 @@
   <div class="char-grid" id="char-grid"></div>
   <div class="char-select-confirm">
     <button class="btn btn-primary" id="confirm-char-btn" onclick="confirmCharacter()" style="opacity:.4;pointer-events:none;">BEGIN YOUR PATH</button>
+    <p id="save-notice" class="hidden" onclick="newGameFromSave()" style="font-size:11px;color:#a855f7;margin-top:4px;cursor:pointer;text-align:center;">↺ Start fresh instead</p>
     <button class="btn btn-secondary" onclick="showScreen('title-screen')">← Back</button>
   </div>
 </div>
@@ -272,6 +273,11 @@
         <div class="action-name">SPECIAL</div>
         <div class="action-desc" id="special-desc">Unlock a skill first</div>
         <div class="action-cost" id="special-cost"></div>
+        <div id="skill-cycle" class="hidden" style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:2px;">
+          <span onclick="event.stopPropagation();cycleSkill(-1)" style="padding:2px 8px;font-size:14px;opacity:0.65;touch-action:none;">◀</span>
+          <span id="skill-idx-label" style="font-size:10px;opacity:0.45;white-space:nowrap;">1/1</span>
+          <span onclick="event.stopPropagation();cycleSkill(1)" style="padding:2px 8px;font-size:14px;opacity:0.65;touch-action:none;">▶</span>
+        </div>
       </div>
       <div class="action-btn" id="btn-defend" onclick="playerAction('defend')">
         <div class="action-icon">🛡️</div>
@@ -485,9 +491,9 @@ function mkPlayer(charType) {
     gold: 0,
     level: 1,
     skills: [],
+    activeSkillIdx: 0,
     potions: 2,
     statusEffects: [],
-    defeatedClans: [],
   };
 }
 
@@ -667,11 +673,44 @@ function selectChar(id) {
   document.getElementById('char-card-'+id).classList.add('selected');
   const btn = document.getElementById('confirm-char-btn');
   btn.style.opacity='1'; btn.style.pointerEvents='all';
+  const save = loadSave(id);
+  const notice = document.getElementById('save-notice');
+  if(save && save.defeatedClans && save.defeatedClans.length > 0) {
+    btn.textContent = `CONTINUE (Lv.${save.level} · ${save.defeatedClans.length}/5 Clans)`;
+    notice.classList.remove('hidden');
+  } else {
+    btn.textContent = 'BEGIN YOUR PATH';
+    notice.classList.add('hidden');
+  }
+}
+
+function newGameFromSave() {
+  try { localStorage.removeItem('shadowPath_' + selectedCharId); } catch(e) {}
+  document.getElementById('save-notice').classList.add('hidden');
+  document.getElementById('confirm-char-btn').textContent = 'BEGIN YOUR PATH';
 }
 
 function confirmCharacter() {
   if(!selectedCharId) return;
-  G.player = mkPlayer(selectedCharId);
+  const save = loadSave(selectedCharId);
+  const btnText = document.getElementById('confirm-char-btn').textContent;
+  if(save && btnText.startsWith('CONTINUE')) {
+    G.player = mkPlayer(selectedCharId);
+    G.player.level = save.level || 1;
+    G.player.xp = save.xp || 0;
+    G.player.gold = save.gold || 0;
+    G.player.potions = save.potions != null ? save.potions : 2;
+    G.player.skills = save.skills || [];
+    G.player.activeSkillIdx = save.activeSkillIdx || 0;
+    G.player.currentHp = save.currentHp || G.player.maxHp;
+    G.player.maxHp = save.maxHp || G.player.maxHp;
+    G.player.atk = save.atk || G.player.atk;
+    G.player.def = save.def || G.player.def;
+    G.defeatedClans = save.defeatedClans || [];
+    G.visitedClans = save.visitedClans || [];
+  } else {
+    G.player = mkPlayer(selectedCharId);
+  }
   showScreen('world-map');
 }
 
@@ -1292,7 +1331,10 @@ function updateActionButtons() {
   const p=G.player;
   document.getElementById('potion-desc').textContent=`${p.potions} potion${p.potions!==1?'s':''}`;
 
-  const skill = p.skills.length>0 ? SKILLS.find(s=>s.id===p.skills[p.skills.length-1]) : null;
+  p.activeSkillIdx = ((p.activeSkillIdx || 0) % Math.max(1, p.skills.length));
+  const activeId = p.skills.length > 0 ? p.skills[p.activeSkillIdx] : null;
+  const skill = activeId ? SKILLS.find(s=>s.id===activeId) : null;
+  const cycleEl = document.getElementById('skill-cycle');
   if(skill) {
     document.getElementById('btn-special').classList.remove('disabled');
     document.querySelector('#btn-special .action-icon').textContent=skill.icon;
@@ -1304,11 +1346,18 @@ function updateActionButtons() {
     } else {
       document.getElementById('special-cost').textContent='Ready!';
     }
+    if(p.skills.length > 1) {
+      cycleEl.classList.remove('hidden');
+      document.getElementById('skill-idx-label').textContent=`${p.activeSkillIdx+1}/${p.skills.length}`;
+    } else {
+      cycleEl.classList.add('hidden');
+    }
   } else {
     document.getElementById('btn-special').classList.add('disabled');
     document.querySelector('#btn-special .action-name').textContent='SPECIAL';
     document.getElementById('special-desc').textContent='Win a clan fight to unlock';
     document.getElementById('special-cost').textContent='';
+    cycleEl.classList.add('hidden');
   }
 
   if(p.potions<=0) document.getElementById('btn-item').classList.add('disabled');
@@ -1360,7 +1409,8 @@ function playerAction(type) {
   }
 
   if(type==='special') {
-    const skill=SKILLS.find(s=>s.id===p.skills[p.skills.length-1]);
+    const activeId = p.skills.length > 0 ? p.skills[p.activeSkillIdx % p.skills.length] : null;
+    const skill = activeId ? SKILLS.find(s=>s.id===activeId) : null;
     if(!skill||G.combat.specialCooldown>0) { enableActions(); G.combat.waitingForPlayer=true; return; }
     G.combat.specialCooldown=skill.cooldown;
 
@@ -1533,6 +1583,7 @@ function combatVictory() {
 
   showScreen('victory-screen');
   updateHUD();
+  saveGame();
 }
 
 function checkLevelUp() {
@@ -1617,6 +1668,7 @@ function handleTrainingTap() {
     // Add skill
     if(!G.player.skills.includes(G.training.skill.id)) {
       G.player.skills.push(G.training.skill.id);
+      saveGame();
     }
     G.training.skill=null;
     setTimeout(()=>{
@@ -1760,7 +1812,44 @@ function startNewGame() {
   showScreen('char-select');
 }
 
-function startCombat_fromMap() { /* alias */ }
+// ── Skill cycling ────────────────────────────────────────────────
+function cycleSkill(dir) {
+  const p = G.player;
+  if(!p || p.skills.length < 2) return;
+  p.activeSkillIdx = ((p.activeSkillIdx || 0) + dir + p.skills.length) % p.skills.length;
+  G.combat.specialCooldown = 0;
+  updateActionButtons();
+}
+
+// ── Save / Load ───────────────────────────────────────────────────
+function saveGame() {
+  const p = G.player;
+  if(!p) return;
+  try {
+    localStorage.setItem('shadowPath_' + p.id, JSON.stringify({
+      charId: p.id,
+      level: p.level,
+      xp: p.xp,
+      gold: p.gold,
+      potions: p.potions,
+      skills: p.skills,
+      activeSkillIdx: p.activeSkillIdx || 0,
+      defeatedClans: G.defeatedClans,
+      visitedClans: G.visitedClans,
+      currentHp: p.currentHp,
+      maxHp: p.maxHp,
+      atk: p.atk,
+      def: p.def,
+    }));
+  } catch(e) {}
+}
+
+function loadSave(charId) {
+  try {
+    const raw = localStorage.getItem('shadowPath_' + charId);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
 
 // Post-load canvas event wiring (map tap needs canvas to exist)
 window.addEventListener('DOMContentLoaded', ()=>{
