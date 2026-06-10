@@ -1,0 +1,1878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Shadow Path: Ninja vs Zombies</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0a0a0f; font-family:'Segoe UI',sans-serif; touch-action:none; }
+  #app { width:100%; height:100%; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  canvas { display:block; touch-action:none; }
+
+  /* ── screens ── */
+  .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#0a0a0f; z-index:10; }
+  .screen.hidden { display:none; }
+
+  /* ── title ── */
+  #title-screen { background: radial-gradient(ellipse at 50% 30%, #1a0a2e 0%, #0a0a0f 70%); }
+  .title-logo { font-size:clamp(28px,8vw,52px); font-weight:900; letter-spacing:3px; text-align:center; line-height:1.15; }
+  .title-logo .shadow { color:#a855f7; text-shadow: 0 0 30px #a855f7, 0 0 60px #7c3aed; }
+  .title-logo .path  { color:#e2e8f0; text-shadow: 0 0 20px #94a3b8; }
+  .title-sub { color:#64748b; font-size:clamp(11px,3.5vw,15px); letter-spacing:6px; margin-top:8px; text-transform:uppercase; }
+  .title-tagline { color:#475569; font-size:clamp(10px,3vw,13px); margin-top:16px; text-align:center; max-width:280px; font-style:italic; }
+  .title-canvas-wrap { width:min(340px,90vw); height:min(220px,55vw); margin:20px 0; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; border:none; border-radius:12px; cursor:pointer; font-weight:700; letter-spacing:1px; transition:all .15s; user-select:none; -webkit-user-select:none; }
+  .btn-primary { background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; padding:14px 40px; font-size:clamp(14px,4vw,17px); box-shadow:0 4px 24px #7c3aed88; border-radius:14px; width:min(240px,72vw); }
+  .btn-primary:active { transform:scale(.96); }
+  .btn-secondary { background:#1e1b2e; color:#a855f7; padding:11px 32px; font-size:clamp(12px,3.5vw,15px); border:1px solid #3b2a6e; border-radius:12px; width:min(200px,64vw); margin-top:10px; }
+  .btn-secondary:active { transform:scale(.96); background:#2a1f4a; }
+  .title-btns { display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:4px; }
+
+  /* ── character select ── */
+  #char-select { background: radial-gradient(ellipse at 50% 0%, #0f0a1e 0%, #0a0a0f 60%); overflow-y:auto; padding:20px 12px 32px; }
+  .screen-title { font-size:clamp(16px,5vw,22px); font-weight:800; color:#e2e8f0; letter-spacing:2px; text-align:center; margin-bottom:4px; }
+  .screen-sub { font-size:clamp(10px,3vw,13px); color:#64748b; text-align:center; margin-bottom:18px; }
+  .char-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; width:100%; max-width:420px; }
+  .char-card { background:#12111f; border:2px solid #1e1b2e; border-radius:16px; padding:14px 10px; cursor:pointer; transition:all .2s; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .char-card:active { transform:scale(.97); }
+  .char-card.selected { border-color:#a855f7; box-shadow:0 0 20px #a855f755; background:#1a1530; }
+  .char-canvas { width:80px; height:90px; }
+  .char-name { font-size:clamp(12px,3.5vw,14px); font-weight:700; color:#e2e8f0; text-align:center; }
+  .char-class { font-size:clamp(9px,2.5vw,11px); color:#a855f7; text-align:center; text-transform:uppercase; letter-spacing:1px; }
+  .char-stats { width:100%; display:flex; flex-direction:column; gap:4px; }
+  .stat-bar { display:flex; align-items:center; gap:4px; }
+  .stat-label { font-size:9px; color:#64748b; width:24px; text-transform:uppercase; }
+  .stat-track { flex:1; height:4px; background:#1e1b2e; border-radius:2px; overflow:hidden; }
+  .stat-fill { height:100%; border-radius:2px; transition:width .3s; }
+  .stat-fill.hp  { background:linear-gradient(90deg,#22c55e,#4ade80); }
+  .stat-fill.atk { background:linear-gradient(90deg,#ef4444,#f97316); }
+  .stat-fill.spd { background:linear-gradient(90deg,#3b82f6,#06b6d4); }
+  .char-lore { font-size:clamp(9px,2.5vw,10px); color:#475569; text-align:center; font-style:italic; margin-top:2px; line-height:1.4; }
+  .char-select-confirm { margin-top:18px; width:100%; max-width:420px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+
+  /* ── world map ── */
+  #world-map { background:#0a0a0f; padding:0; overflow:hidden; }
+  #map-canvas { width:100%; height:100%; }
+  .hud { position:absolute; top:0; left:0; right:0; padding:10px 14px 0; display:flex; align-items:flex-start; justify-content:space-between; pointer-events:none; z-index:20; }
+  .hud-left { display:flex; flex-direction:column; gap:3px; }
+  .hud-name { font-size:clamp(11px,3vw,14px); font-weight:700; color:#e2e8f0; }
+  .hud-level { font-size:clamp(9px,2.5vw,11px); color:#a855f7; }
+  .hud-bar-wrap { display:flex; align-items:center; gap:5px; }
+  .hud-bar-label { font-size:9px; color:#64748b; width:20px; }
+  .hud-bar { width:90px; height:6px; background:#1e1b2e; border-radius:3px; overflow:hidden; }
+  .hud-bar-fill { height:100%; border-radius:3px; transition:width .4s; }
+  .hud-bar-fill.hp  { background:linear-gradient(90deg,#22c55e,#4ade80); }
+  .hud-bar-fill.xp  { background:linear-gradient(90deg,#f59e0b,#fbbf24); }
+  .hud-right { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+  .hud-gold { font-size:clamp(11px,3vw,13px); color:#fbbf24; font-weight:700; }
+  .hud-skills { font-size:clamp(9px,2.5vw,10px); color:#64748b; }
+  .map-action-btn { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); pointer-events:all; }
+  .map-msg { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:#12111fcc; border:1px solid #3b2a6e; border-radius:14px; padding:14px 20px; text-align:center; color:#e2e8f0; font-size:clamp(12px,3.5vw,15px); pointer-events:none; max-width:280px; backdrop-filter:blur(6px); }
+
+  /* ── combat ── */
+  #combat-screen { background:#0a0a0f; overflow:hidden; }
+  #combat-canvas { width:100%; flex:1; }
+  .combat-ui { width:100%; padding:10px 14px; display:flex; flex-direction:column; gap:8px; background:linear-gradient(0deg,#0a0a0f 60%,transparent); }
+  .combat-bars { display:flex; justify-content:space-between; align-items:flex-end; }
+  .combat-entity { display:flex; flex-direction:column; gap:3px; max-width:48%; }
+  .combat-entity.enemy { align-items:flex-end; }
+  .entity-name { font-size:clamp(10px,3vw,13px); font-weight:700; color:#e2e8f0; }
+  .entity-class { font-size:9px; color:#64748b; text-transform:uppercase; letter-spacing:1px; }
+  .entity-hp-bar { width:min(150px,42vw); height:8px; background:#1e1b2e; border-radius:4px; overflow:hidden; }
+  .entity-hp-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,#22c55e,#4ade80); transition:width .4s; }
+  .entity-hp-fill.enemy { background:linear-gradient(90deg,#ef4444,#f97316); }
+  .entity-hp-text { font-size:9px; color:#64748b; }
+  .combat-vs { color:#475569; font-size:clamp(10px,3vw,14px); font-weight:700; align-self:center; }
+  .combat-status { min-height:28px; background:#12111f; border-radius:8px; padding:6px 10px; }
+  .combat-status p { font-size:clamp(10px,3vw,12px); color:#94a3b8; text-align:center; font-style:italic; }
+  .combat-actions { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .action-btn { background:#12111f; border:1.5px solid #1e1b2e; border-radius:12px; padding:10px 8px; cursor:pointer; transition:all .15s; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .action-btn:active { transform:scale(.96); border-color:#a855f7; background:#1a1530; }
+  .action-btn.special { border-color:#7c3aed44; background:#1a0a2e; }
+  .action-btn.disabled { opacity:.35; pointer-events:none; }
+  .action-icon { font-size:clamp(18px,5vw,24px); }
+  .action-name { font-size:clamp(9px,2.5vw,11px); font-weight:700; color:#e2e8f0; }
+  .action-desc { font-size:clamp(8px,2vw,10px); color:#64748b; text-align:center; }
+  .action-cost { font-size:8px; color:#a855f7; }
+
+  /* ── outcome screens ── */
+  #victory-screen, #defeat-screen { background:radial-gradient(ellipse at 50% 30%,#0f1a0a 0%,#0a0a0f 60%); padding:24px 20px; gap:12px; }
+  #defeat-screen { background:radial-gradient(ellipse at 50% 30%,#1a0a0a 0%,#0a0a0f 60%); }
+  .outcome-icon { font-size:clamp(48px,14vw,72px); }
+  .outcome-title { font-size:clamp(22px,7vw,36px); font-weight:900; letter-spacing:2px; }
+  .outcome-title.win  { color:#4ade80; text-shadow:0 0 30px #22c55e; }
+  .outcome-title.lose { color:#ef4444; text-shadow:0 0 30px #dc2626; }
+  .outcome-msg { font-size:clamp(11px,3.5vw,14px); color:#94a3b8; text-align:center; max-width:300px; line-height:1.5; }
+  .rewards-box { background:#12111f; border:1px solid #1e1b2e; border-radius:14px; padding:14px 18px; width:100%; max-width:320px; }
+  .rewards-title { font-size:clamp(10px,3vw,12px); color:#a855f7; text-transform:uppercase; letter-spacing:2px; margin-bottom:8px; }
+  .reward-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #1e1b2e; }
+  .reward-row:last-child { border-bottom:none; }
+  .reward-label { font-size:clamp(10px,3vw,12px); color:#94a3b8; }
+  .reward-val   { font-size:clamp(10px,3vw,12px); color:#4ade80; font-weight:700; }
+  .new-skill-box { background:#1a0a2e; border:1px solid #7c3aed44; border-radius:14px; padding:12px 16px; width:100%; max-width:320px; margin-top:4px; }
+  .new-skill-title { font-size:clamp(9px,2.5vw,11px); color:#a855f7; text-transform:uppercase; letter-spacing:2px; margin-bottom:4px; }
+  .new-skill-name { font-size:clamp(14px,4vw,18px); font-weight:800; color:#e2e8f0; }
+  .new-skill-desc { font-size:clamp(10px,3vw,12px); color:#64748b; margin-top:3px; }
+
+  /* ── training screen ── */
+  #training-screen { background:radial-gradient(ellipse at 50% 30%,#0a0f1a 0%,#0a0a0f 60%); padding:24px 20px; gap:12px; }
+  .training-title { font-size:clamp(18px,6vw,28px); font-weight:800; color:#3b82f6; text-shadow:0 0 20px #2563eb; }
+  .training-desc { font-size:clamp(11px,3.5vw,14px); color:#94a3b8; text-align:center; max-width:300px; line-height:1.5; }
+  .training-canvas-wrap { width:min(280px,80vw); height:min(160px,45vw); }
+  .training-challenge { background:#12111f; border:1px solid #1e1b2e; border-radius:14px; padding:14px 18px; width:100%; max-width:320px; }
+  .challenge-prompt { font-size:clamp(11px,3.5vw,14px); color:#e2e8f0; text-align:center; margin-bottom:12px; }
+  .tap-target { width:80px; height:80px; border-radius:50%; background:linear-gradient(135deg,#1e3a5f,#2563eb); border:3px solid #3b82f6; display:flex; align-items:center; justify-content:center; font-size:28px; cursor:pointer; margin:0 auto; transition:all .1s; box-shadow:0 0 20px #2563eb44; }
+  .tap-target:active { transform:scale(.9); background:linear-gradient(135deg,#2563eb,#3b82f6); }
+  .tap-progress { width:100%; height:6px; background:#1e1b2e; border-radius:3px; overflow:hidden; margin-top:12px; }
+  .tap-progress-fill { height:100%; background:linear-gradient(90deg,#3b82f6,#06b6d4); border-radius:3px; transition:width .2s; }
+  .tap-count { font-size:clamp(10px,3vw,12px); color:#64748b; text-align:center; margin-top:6px; }
+
+  /* ── clan intro ── */
+  #clan-intro { background:#0a0a0f; padding:28px 20px; gap:14px; }
+  .clan-banner { width:min(320px,88vw); height:min(160px,44vw); border-radius:16px; overflow:hidden; }
+  .clan-name-big { font-size:clamp(22px,7vw,36px); font-weight:900; text-align:center; letter-spacing:3px; }
+  .clan-desc { font-size:clamp(11px,3.5vw,14px); color:#94a3b8; text-align:center; max-width:300px; line-height:1.6; }
+  .clan-boss-row { display:flex; align-items:center; gap:12px; background:#12111f; border:1px solid #1e1b2e; border-radius:14px; padding:12px 16px; width:100%; max-width:320px; }
+  .clan-boss-canvas { width:60px; height:70px; flex-shrink:0; }
+  .clan-boss-info { flex:1; }
+  .clan-boss-label { font-size:9px; color:#64748b; text-transform:uppercase; letter-spacing:1px; }
+  .clan-boss-name { font-size:clamp(13px,4vw,16px); font-weight:700; color:#e2e8f0; }
+  .clan-boss-desc { font-size:clamp(9px,2.5vw,11px); color:#64748b; margin-top:2px; }
+
+  /* ── loot popup ── */
+  #loot-popup { position:fixed; bottom:-200px; left:50%; transform:translateX(-50%); background:#12111f; border:1px solid #3b2a6e; border-radius:16px 16px 0 0; padding:18px 24px 32px; width:min(360px,100vw); transition:bottom .35s cubic-bezier(.4,0,.2,1); z-index:100; }
+  #loot-popup.show { bottom:0; }
+  .loot-title { font-size:clamp(12px,3.5vw,15px); font-weight:700; color:#a855f7; text-align:center; margin-bottom:12px; }
+  .loot-items { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .loot-item { background:#1e1b2e; border-radius:10px; padding:8px 12px; display:flex; align-items:center; gap:6px; }
+  .loot-item-icon { font-size:18px; }
+  .loot-item-name { font-size:clamp(10px,3vw,12px); color:#e2e8f0; }
+  .loot-item-val  { font-size:10px; color:#a855f7; }
+
+  /* ── scrollbar hide ── */
+  ::-webkit-scrollbar { width:0; }
+
+  /* ── utility ── */
+  .hidden { display:none !important; }
+  .fade-in { animation: fadeIn .4s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  .pulse { animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+  /* canvas shimmer for title art */
+  #title-art { border-radius:16px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══════════════ TITLE SCREEN ══════════════ -->
+<div id="title-screen" class="screen">
+  <div class="title-logo">
+    <div class="shadow">SHADOW PATH</div>
+    <div class="path" style="font-size:.55em;letter-spacing:8px;color:#475569">NINJA VS ZOMBIES</div>
+  </div>
+  <div class="title-sub">An Epic Mobile Adventure</div>
+  <div class="title-canvas-wrap">
+    <canvas id="title-art" style="width:100%;height:100%;border-radius:16px;"></canvas>
+  </div>
+  <div class="title-tagline">"Lost and clanless, a ninja walks the shadow path — seeking a master worth following."</div>
+  <div class="title-btns">
+    <button class="btn btn-primary" onclick="startNewGame()">⚔️ BEGIN JOURNEY</button>
+    <button class="btn btn-secondary" onclick="showHowToPlay()">📜 How to Play</button>
+  </div>
+</div>
+
+<!-- ══════════════ CHARACTER SELECT ══════════════ -->
+<div id="char-select" class="screen hidden">
+  <div class="screen-title">CHOOSE YOUR NINJA</div>
+  <div class="screen-sub">Each path leads to a different destiny</div>
+  <div class="char-grid" id="char-grid"></div>
+  <div class="char-select-confirm">
+    <button class="btn btn-primary" id="confirm-char-btn" onclick="confirmCharacter()" style="opacity:.4;pointer-events:none;">BEGIN YOUR PATH</button>
+    <p id="save-notice" class="hidden" onclick="newGameFromSave()" style="font-size:11px;color:#a855f7;margin-top:4px;cursor:pointer;text-align:center;">↺ Start fresh instead</p>
+    <button class="btn btn-secondary" onclick="showScreen('title-screen')">← Back</button>
+  </div>
+</div>
+
+<!-- ══════════════ CLAN INTRO ══════════════ -->
+<div id="clan-intro" class="screen hidden">
+  <div class="screen-title" style="font-size:clamp(10px,3vw,12px);color:#64748b;letter-spacing:4px;">YOU ARRIVE AT</div>
+  <canvas class="clan-banner" id="clan-banner-canvas"></canvas>
+  <div class="clan-name-big" id="clan-name-big">DRAGON CLAN</div>
+  <div class="clan-desc" id="clan-desc-text">Masters of fire and fury, the Dragon Clan tests all who dare approach their mountain fortress.</div>
+  <div class="clan-boss-row">
+    <canvas class="clan-boss-canvas" id="clan-boss-canvas"></canvas>
+    <div class="clan-boss-info">
+      <div class="clan-boss-label">You face the champion</div>
+      <div class="clan-boss-name" id="clan-boss-name">Kage Ryū</div>
+      <div class="clan-boss-desc" id="clan-boss-desc">Fire master, undefeated in 40 seasons</div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px;margin-top:8px;">
+    <button class="btn btn-primary" onclick="startClanCombat()">⚔️ Fight the Champion</button>
+    <button class="btn btn-secondary" onclick="showScreen('world-map')">← Leave this place</button>
+  </div>
+</div>
+
+<!-- ══════════════ WORLD MAP ══════════════ -->
+<div id="world-map" class="screen hidden" style="padding:0;overflow:hidden;">
+  <div class="hud">
+    <div class="hud-left">
+      <div class="hud-name" id="hud-name">Shadow Ninja</div>
+      <div class="hud-level" id="hud-level">Level 1 · Shadow Walker</div>
+      <div class="hud-bar-wrap">
+        <div class="hud-bar-label">HP</div>
+        <div class="hud-bar"><div class="hud-bar-fill hp" id="hud-hp-fill" style="width:100%"></div></div>
+      </div>
+      <div class="hud-bar-wrap">
+        <div class="hud-bar-label">XP</div>
+        <div class="hud-bar"><div class="hud-bar-fill xp" id="hud-xp-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="hud-right">
+      <div class="hud-gold" id="hud-gold">💰 0</div>
+      <div class="hud-skills" id="hud-skills">Skills: 0</div>
+    </div>
+  </div>
+  <canvas id="map-canvas"></canvas>
+  <div class="map-msg hidden" id="map-msg"></div>
+</div>
+
+<!-- ══════════════ COMBAT SCREEN ══════════════ -->
+<div id="combat-screen" class="screen hidden" style="flex-direction:column;padding:0;">
+  <canvas id="combat-canvas"></canvas>
+  <div class="combat-ui">
+    <div class="combat-bars">
+      <div class="combat-entity">
+        <div class="entity-name" id="player-combat-name">You</div>
+        <div class="entity-class" id="player-combat-class">Shadow Ninja</div>
+        <div class="entity-hp-bar"><div class="entity-hp-fill" id="player-hp-fill" style="width:100%"></div></div>
+        <div class="entity-hp-text" id="player-hp-text">100/100</div>
+      </div>
+      <div class="combat-vs">VS</div>
+      <div class="combat-entity enemy">
+        <div class="entity-name" id="enemy-combat-name">Zombie</div>
+        <div class="entity-class" id="enemy-combat-class">Undead</div>
+        <div class="entity-hp-bar"><div class="entity-hp-fill enemy" id="enemy-hp-fill" style="width:100%"></div></div>
+        <div class="entity-hp-text" id="enemy-hp-text">80/80</div>
+      </div>
+    </div>
+    <div class="combat-status"><p id="combat-msg">The battle begins…</p></div>
+    <div class="combat-actions" id="combat-actions">
+      <div class="action-btn" id="btn-attack" onclick="playerAction('attack')">
+        <div class="action-icon">⚔️</div>
+        <div class="action-name">STRIKE</div>
+        <div class="action-desc">Basic sword attack</div>
+      </div>
+      <div class="action-btn special" id="btn-special" onclick="playerAction('special')">
+        <div class="action-icon">🌀</div>
+        <div class="action-name">SPECIAL</div>
+        <div class="action-desc" id="special-desc">Unlock a skill first</div>
+        <div class="action-cost" id="special-cost"></div>
+        <div id="skill-cycle" class="hidden" style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:2px;">
+          <span onclick="event.stopPropagation();cycleSkill(-1)" style="padding:2px 8px;font-size:14px;opacity:0.65;touch-action:none;">◀</span>
+          <span id="skill-idx-label" style="font-size:10px;opacity:0.45;white-space:nowrap;">1/1</span>
+          <span onclick="event.stopPropagation();cycleSkill(1)" style="padding:2px 8px;font-size:14px;opacity:0.65;touch-action:none;">▶</span>
+        </div>
+      </div>
+      <div class="action-btn" id="btn-defend" onclick="playerAction('defend')">
+        <div class="action-icon">🛡️</div>
+        <div class="action-name">FOCUS</div>
+        <div class="action-desc">Reduce next hit by 50%</div>
+      </div>
+      <div class="action-btn" id="btn-item" onclick="playerAction('item')">
+        <div class="action-icon">🧪</div>
+        <div class="action-name">POTION</div>
+        <div class="action-desc" id="potion-desc">0 potions</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ VICTORY SCREEN ══════════════ -->
+<div id="victory-screen" class="screen hidden fade-in">
+  <div class="outcome-icon">🏆</div>
+  <div class="outcome-title win" id="victory-title">VICTORY!</div>
+  <div class="outcome-msg" id="victory-msg">You have bested your opponent.</div>
+  <div class="rewards-box" id="rewards-box">
+    <div class="rewards-title">⚡ Rewards</div>
+    <div class="reward-row"><span class="reward-label">Experience</span><span class="reward-val" id="rew-xp">+0 XP</span></div>
+    <div class="reward-row"><span class="reward-label">Gold</span><span class="reward-val" id="rew-gold">+0 💰</span></div>
+    <div class="reward-row hidden" id="rew-potion-row"><span class="reward-label">Health Potion</span><span class="reward-val" id="rew-potion">+0</span></div>
+  </div>
+  <div class="new-skill-box hidden" id="new-skill-box">
+    <div class="new-skill-title">✨ New Skill Unlocked</div>
+    <div class="new-skill-name" id="new-skill-name">Void Strike</div>
+    <div class="new-skill-desc" id="new-skill-desc">Teleport behind enemy for a devastating backstab.</div>
+  </div>
+  <button class="btn btn-primary" id="victory-continue-btn" onclick="continueFromVictory()" style="margin-top:8px;">Continue Journey →</button>
+</div>
+
+<!-- ══════════════ DEFEAT SCREEN ══════════════ -->
+<div id="defeat-screen" class="screen hidden fade-in">
+  <div class="outcome-icon">💀</div>
+  <div class="outcome-title lose">DEFEATED</div>
+  <div class="outcome-msg" id="defeat-msg">You have been bested. Train harder and return.</div>
+  <div class="new-skill-box" style="border-color:#2563eb44;background:#0a1020;">
+    <div class="new-skill-title" style="color:#3b82f6;">📖 Required Training</div>
+    <div class="new-skill-name" id="training-skill-name" style="color:#93c5fd;">Iron Block</div>
+    <div class="new-skill-desc" id="training-skill-desc">You must master this skill before you can advance.</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px;margin-top:8px;">
+    <button class="btn btn-primary" onclick="goToTraining()" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);">🥋 Begin Training</button>
+    <button class="btn btn-secondary" onclick="retryFromDefeat()">↩ Retreat to Map</button>
+  </div>
+</div>
+
+<!-- ══════════════ TRAINING SCREEN ══════════════ -->
+<div id="training-screen" class="screen hidden">
+  <div class="screen-title" style="color:#3b82f6;">TRAINING GROUNDS</div>
+  <div class="training-title" id="train-skill-title">Iron Block</div>
+  <div class="training-desc" id="train-skill-lore">Focus your chi and create an unbreakable barrier of pure energy.</div>
+  <canvas class="training-canvas-wrap" id="training-canvas"></canvas>
+  <div class="training-challenge">
+    <div class="challenge-prompt" id="challenge-prompt">Tap the target 20 times to master this technique!</div>
+    <div class="tap-target" id="tap-target" onclick="handleTrainingTap()">🥷</div>
+    <div class="tap-progress"><div class="tap-progress-fill" id="tap-progress-fill" style="width:0%"></div></div>
+    <div class="tap-count" id="tap-count">0 / 20</div>
+  </div>
+  <button class="btn btn-secondary" onclick="showScreen('world-map')" style="margin-top:8px;">← Back to Map</button>
+</div>
+
+<!-- ══════════════ LOOT POPUP ══════════════ -->
+<div id="loot-popup">
+  <div class="loot-title">⚔️ Loot Collected!</div>
+  <div class="loot-items" id="loot-items-list"></div>
+  <button class="btn btn-secondary" onclick="closeLoot()" style="width:100%;margin-top:12px;">Nice!</button>
+</div>
+
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  SHADOW PATH: NINJA VS ZOMBIES  —  Game Engine
+// ═══════════════════════════════════════════════════════════════
+
+// ── Constants ──────────────────────────────────────────────────
+const CHAR_TYPES = [
+  {
+    id:'shadow', name:'Ryu Kage', title:'Shadow Walker',
+    hp:90, atk:22, def:10, spd:95, critChance:.20,
+    color:'#7c3aed', accent:'#a855f7', weapon:'⚔️',
+    lore:'Swift as darkness, strikes before seen.',
+    hpStat:55, atkStat:80, spdStat:100,
+    startSkill: null,
+  },
+  {
+    id:'steel', name:'Tetsu',    title:'Iron Warrior',
+    hp:140, atk:18, def:20, spd:55, critChance:.10,
+    color:'#374151', accent:'#9ca3af', weapon:'🗡️',
+    lore:'Unyielding armor, mountain of resolve.',
+    hpStat:100, atkStat:65, spdStat:40,
+    startSkill: null,
+  },
+  {
+    id:'fire',   name:'Homura',  title:'Flame Dancer',
+    hp:100, atk:26, def:8, spd:75, critChance:.15,
+    color:'#b45309', accent:'#f97316', weapon:'🔥',
+    lore:'Burns with inner fury, never extinguished.',
+    hpStat:65, atkStat:95, spdStat:75,
+    startSkill: null,
+  },
+  {
+    id:'wind',   name:'Kazé',    title:'Wind Sage',
+    hp:110, atk:20, def:14, spd:85, critChance:.18,
+    color:'#0e7490', accent:'#06b6d4', weapon:'💨',
+    lore:'Reads the wind, strikes where least expected.',
+    hpStat:72, atkStat:72, spdStat:88,
+    startSkill: null,
+  },
+  {
+    id:'poison', name:'Dokuta',  title:'Venom Fang',
+    hp:95, atk:16, def:12, spd:80, critChance:.22,
+    color:'#166534', accent:'#4ade80', weapon:'🗡️',
+    lore:'One scratch is all it takes. Patience is the weapon.',
+    hpStat:60, atkStat:60, spdStat:82,
+    startSkill: null,
+  },
+];
+
+const SKILLS = [
+  { id:'void_strike',   name:'Void Strike',    icon:'🌀', desc:'Teleport behind enemy for 2× damage.',      dmgMult:2.0, cooldown:3, clan:0 },
+  { id:'iron_block',    name:'Iron Block',      icon:'🛡️', desc:'Nullify all damage for one turn.',          dmgMult:0,   cooldown:4, isDefend:true, clan:1 },
+  { id:'fire_burst',    name:'Fire Burst',      icon:'🔥', desc:'Ignite enemy — 15 burn damage for 3 turns.',dmgMult:1.0, cooldown:3, burn:15, burnTurns:3, clan:2 },
+  { id:'shadow_clone',  name:'Shadow Clone',    icon:'👥', desc:'50% chance enemy hits a clone, not you.',   dmgMult:0,   cooldown:4, clone:true, clan:3 },
+  { id:'death_bloom',   name:'Death Bloom',     icon:'💀', desc:'Triple strike — hits three times fast.',    dmgMult:0.8, hits:3, cooldown:5, clan:4 },
+  { id:'venom_blade',   name:'Venom Blade',     icon:'☠️', desc:'Poison — 10 damage per turn for 5 turns.',  dmgMult:1.2, poison:10, poisonTurns:5, cooldown:3, clan:5 },
+  { id:'thunder_step',  name:'Thunder Step',    icon:'⚡', desc:'Lightning dash deals 1.8× damage.',        dmgMult:1.8, cooldown:2, clan:6 },
+  { id:'spirit_drain',  name:'Spirit Drain',    icon:'👻', desc:'Steal 30% of damage dealt as HP.',          dmgMult:1.5, drain:.30, cooldown:4, clan:7 },
+];
+
+const CLANS = [
+  { id:'dragon', name:'Dragon Clan', color:'#991b1b', accent:'#ef4444', bgColor:'#1a0a0a',
+    boss:'Kage Ryū', bossTitle:'Fire Champion', bossDesc:'Undefeated in 40 seasons',
+    desc:'Masters of fire and fury, testing all who dare approach their mountain fortress.',
+    bossHp:120, bossAtk:24, bossDef:10, bossType:'dragon',
+    rewardSkill:0, mapX:.15, mapY:.20 },
+  { id:'iron',   name:'Iron Clan',   color:'#374151', accent:'#9ca3af', bgColor:'#0f1115',
+    boss:'General Kuro', bossTitle:'Steel Fist', bossDesc:'Commands an army of steel golems',
+    desc:'Discipline above all. Their fortress walls are said to be unbreakable.',
+    bossHp:160, bossAtk:20, bossDef:25, bossType:'armored',
+    rewardSkill:1, mapX:.78, mapY:.18 },
+  { id:'flame',  name:'Flame Clan',  color:'#b45309', accent:'#f59e0b', bgColor:'#1a1000',
+    boss:'Kazura Blaze', bossTitle:'Inferno Master', bossDesc:'Can conjure fire from thin air',
+    desc:'Wild and unpredictable, they say their dojo has burned down 12 times.',
+    bossHp:130, bossAtk:30, bossDef:8, bossType:'fire',
+    rewardSkill:2, mapX:.50, mapY:.40 },
+  { id:'shadow', name:'Shadow Clan', color:'#1e1b4b', accent:'#818cf8', bgColor:'#080814',
+    boss:'Yami no Sen', bossTitle:'Phantom Lord', bossDesc:'Some say he has no physical form',
+    desc:'They exist only in whispers. Finding their dojo is itself the first test.',
+    bossHp:110, bossAtk:28, bossDef:15, bossType:'shadow',
+    rewardSkill:3, mapX:.25, mapY:.65 },
+  { id:'storm',  name:'Storm Clan',  color:'#1e3a5f', accent:'#38bdf8', bgColor:'#080f1a',
+    boss:'Raiden Tora', bossTitle:'Thunder Lord', bossDesc:'Strikes as fast as lightning',
+    desc:'High in the mountains where lightning never stops, they have mastered speed itself.',
+    bossHp:145, bossAtk:26, bossDef:12, bossType:'storm',
+    rewardSkill:4, mapX:.70, mapY:.60 },
+];
+
+const ZOMBIE_TYPES = [
+  { id:'walker',  name:'Rotting Walker',  icon:'🧟', hp:45, atk:10, def:3, xp:20, gold:8,  type:'basic' },
+  { id:'runner',  name:'Feral Runner',    icon:'🧟', hp:35, atk:16, def:2, xp:30, gold:12, type:'fast' },
+  { id:'brute',   name:'Zombie Brute',    icon:'🧟', hp:80, atk:14, def:8, xp:45, gold:20, type:'tank' },
+  { id:'undead_ninja', name:'Undead Ninja', icon:'🥷', hp:60, atk:20, def:6, xp:60, gold:30, type:'ninja' },
+  { id:'horde',   name:'Zombie Horde',    icon:'🧟', hp:100,atk:18, def:5, xp:80, gold:40, type:'horde' },
+];
+
+const LEVEL_TITLES = [
+  'Wanderer','Initiate','Apprentice','Adept','Journeyman',
+  'Warrior','Veteran','Master','Grand Master','Shadow Lord'
+];
+
+const XP_PER_LEVEL = [0,50,120,220,350,520,730,990,1300,1700];
+
+// ── State ────────────────────────────────────────────────────────
+let G = {
+  screen: 'title',
+  player: null,
+  currentEnemy: null,
+  currentClan: null,
+  isClanFight: false,
+  combat: {
+    turn: 0,
+    playerDefending: false,
+    playerClone: false,
+    specialCooldown: 0,
+    enemyBurnTurns: 0, enemyBurnDmg: 0,
+    playerPoisonTurns: 0, playerPoisonDmg: 0,
+    enemyPoisonTurns: 0, enemyPoisonDmg: 0,
+    waitingForPlayer: false,
+  },
+  training: { skill: null, taps: 0, required: 20 },
+  defeatedClans: [],
+  visitedClans: [],
+  mapParticles: [],
+  combatParticles: [],
+  animFrame: null,
+  titleAnimFrame: null,
+};
+
+function mkPlayer(charType) {
+  const t = CHAR_TYPES.find(c=>c.id===charType) || CHAR_TYPES[0];
+  return {
+    ...t,
+    maxHp: t.hp,
+    currentHp: t.hp,
+    xp: 0,
+    gold: 0,
+    level: 1,
+    skills: [],
+    activeSkillIdx: 0,
+    potions: 2,
+    statusEffects: [],
+  };
+}
+
+// ── Screen management ────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  G.screen = id.replace('-screen','').replace('-','_');
+  if(id==='world-map') {
+    resizeMapCanvas();
+    updateHUD();
+    startMapLoop();
+  }
+}
+
+// ── Title art ────────────────────────────────────────────────────
+function initTitleArt() {
+  const wrap = document.querySelector('.title-canvas-wrap');
+  const canvas = document.getElementById('title-art');
+  canvas.width  = wrap.clientWidth  * window.devicePixelRatio;
+  canvas.height = wrap.clientHeight * window.devicePixelRatio;
+  canvas.style.width  = wrap.clientWidth  + 'px';
+  canvas.style.height = wrap.clientHeight + 'px';
+  animateTitleArt(canvas, 0);
+}
+
+function animateTitleArt(canvas, t) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const dpr = window.devicePixelRatio;
+  ctx.clearRect(0,0,W,H);
+
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#0a0010'); sky.addColorStop(.5,'#1a0030'); sky.addColorStop(1,'#0a1a00');
+  ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
+
+  // Moon
+  const mx = W*.75, my = H*.22, mr = H*.12;
+  const moon = ctx.createRadialGradient(mx,my,0,mx,my,mr);
+  moon.addColorStop(0,'#ffe9b0'); moon.addColorStop(.6,'#ffd06a'); moon.addColorStop(1,'#ff8c0000');
+  ctx.fillStyle = moon; ctx.beginPath(); ctx.arc(mx,my,mr,0,Math.PI*2); ctx.fill();
+
+  // Stars
+  ctx.fillStyle='#ffffffcc';
+  const stars=[[.1,.1],[.2,.05],[.4,.08],[.55,.15],[.85,.05],[.92,.12],[.08,.3],[.3,.25],[.6,.3]];
+  stars.forEach(([sx,sy])=>{
+    const ss = Math.sin(t*2+sx*10)*.5+.5;
+    ctx.globalAlpha=.4+ss*.6; ctx.beginPath();
+    ctx.arc(sx*W,sy*H,1.2*dpr,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // Ground mist
+  const mist = ctx.createLinearGradient(0,H*.65,0,H);
+  mist.addColorStop(0,'transparent'); mist.addColorStop(1,'#0a2a0a88');
+  ctx.fillStyle=mist; ctx.fillRect(0,H*.65,W,H*.35);
+
+  // Zombie silhouettes (background)
+  const zombieX = [.05,.18,.82,.92];
+  zombieX.forEach((zx,i)=>{
+    const sway = Math.sin(t*1.5+i*2)*.008*W;
+    drawZombieSilhouette(ctx, zx*W+sway, H*.78, H*.18, '#1a3a1a66');
+  });
+
+  // Ninja hero center
+  const nx = W*.3, ny = H*.72;
+  const heroFloat = Math.sin(t*2)*.012*H;
+  drawNinjaHeroSilhouette(ctx, nx, ny+heroFloat, H*.34, '#a855f7cc');
+
+  // Glow around ninja
+  const glow = ctx.createRadialGradient(nx,ny,0,nx,ny,H*.2);
+  glow.addColorStop(0,'#a855f722'); glow.addColorStop(1,'transparent');
+  ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+
+  // Flying shuriken
+  const sx2 = ((t*80)%W), sy2 = H*.55 + Math.sin(t*3)*H*.05;
+  drawShuriken(ctx, sx2, sy2, 8*dpr, t*5, '#cbd5e1');
+
+  G.titleAnimFrame = requestAnimationFrame(nt => animateTitleArt(canvas, nt/1000));
+}
+
+function drawZombieSilhouette(ctx,x,y,h,color) {
+  ctx.fillStyle=color;
+  // body
+  ctx.fillRect(x-h*.06,y-h*.5,h*.12,h*.4);
+  // head
+  ctx.beginPath(); ctx.arc(x,y-h*.55,h*.1,0,Math.PI*2); ctx.fill();
+  // arms (outstretched)
+  ctx.fillRect(x-h*.25,y-h*.44,h*.19,h*.05);
+  ctx.fillRect(x+h*.06,y-h*.44,h*.19,h*.05);
+  // legs
+  ctx.save(); ctx.translate(x,y-h*.1); ctx.rotate(.15);
+  ctx.fillRect(-h*.03,0,h*.06,h*.25); ctx.restore();
+  ctx.save(); ctx.translate(x,y-h*.1); ctx.rotate(-.15);
+  ctx.fillRect(-h*.03,0,h*.06,h*.25); ctx.restore();
+}
+
+function drawNinjaHeroSilhouette(ctx,x,y,h,color) {
+  ctx.save();
+  ctx.shadowColor=color; ctx.shadowBlur=20;
+  ctx.fillStyle=color;
+  // legs
+  ctx.save(); ctx.translate(x,y-h*.15); ctx.rotate(-.1);
+  ctx.fillRect(-h*.04,0,h*.07,h*.3); ctx.restore();
+  ctx.save(); ctx.translate(x,y-h*.15); ctx.rotate(.3);
+  ctx.fillRect(-h*.02,0,h*.07,h*.28); ctx.restore();
+  // body
+  ctx.beginPath(); ctx.moveTo(x-h*.12,y-h*.15);
+  ctx.lineTo(x+h*.1,y-h*.15); ctx.lineTo(x+h*.08,y-h*.55);
+  ctx.lineTo(x-h*.1,y-h*.55); ctx.closePath(); ctx.fill();
+  // head
+  ctx.beginPath(); ctx.arc(x,y-h*.62,h*.1,0,Math.PI*2); ctx.fill();
+  // sword arm extended
+  ctx.save(); ctx.translate(x,y-h*.4); ctx.rotate(-Math.PI*.25);
+  ctx.fillRect(-h*.03,0,h*.05,h*.35); // arm
+  ctx.fillRect(-h*.01,-h*.4,h*.03,h*.42); // blade
+  ctx.restore();
+  // scarf wisps
+  ctx.strokeStyle='#a855f799'; ctx.lineWidth=3;
+  for(let i=0;i<3;i++){
+    ctx.beginPath(); ctx.moveTo(x+h*.08,y-h*.58);
+    const cx1=x+h*(.1+i*.04), cy1=y-h*(.52-i*.04);
+    const cx2=x+h*(.2+i*.03), cy2=y-h*(.45+i*.05);
+    ctx.quadraticCurveTo(cx1,cy1,cx2,cy2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawShuriken(ctx,x,y,r,angle,color) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(angle);
+  ctx.fillStyle=color; ctx.shadowColor=color; ctx.shadowBlur=6;
+  for(let i=0;i<4;i++){
+    ctx.save(); ctx.rotate(i*Math.PI/2);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(r*.4,r*.4); ctx.lineTo(0,r); ctx.lineTo(-r*.4,r*.4); ctx.closePath();
+    ctx.fill(); ctx.restore();
+  }
+  ctx.restore();
+}
+
+// ── Character select ──────────────────────────────────────────────
+let selectedCharId = null;
+function buildCharGrid() {
+  const grid = document.getElementById('char-grid');
+  grid.innerHTML='';
+  CHAR_TYPES.forEach(c=>{
+    const card = document.createElement('div');
+    card.className='char-card';
+    card.id='char-card-'+c.id;
+    card.onclick = ()=>selectChar(c.id);
+
+    const canvas = document.createElement('canvas');
+    canvas.className='char-canvas';
+    canvas.width=80; canvas.height=90;
+    card.appendChild(canvas);
+
+    card.innerHTML += `
+      <div class="char-name">${c.name}</div>
+      <div class="char-class">${c.title}</div>
+      <div class="char-stats">
+        <div class="stat-bar"><div class="stat-label">HP</div><div class="stat-track"><div class="stat-fill hp" style="width:${c.hpStat}%"></div></div></div>
+        <div class="stat-bar"><div class="stat-label">ATK</div><div class="stat-track"><div class="stat-fill atk" style="width:${c.atkStat}%"></div></div></div>
+        <div class="stat-bar"><div class="stat-label">SPD</div><div class="stat-track"><div class="stat-fill spd" style="width:${c.spdStat}%"></div></div></div>
+      </div>
+      <div class="char-lore">${c.lore}</div>
+    `;
+    // Insert canvas back (innerHTML removed it)
+    card.insertBefore(canvas, card.firstChild);
+    drawCharPortrait(canvas, c);
+    grid.appendChild(card);
+  });
+}
+
+function selectChar(id) {
+  selectedCharId = id;
+  document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('char-card-'+id).classList.add('selected');
+  const btn = document.getElementById('confirm-char-btn');
+  btn.style.opacity='1'; btn.style.pointerEvents='all';
+  const save = loadSave(id);
+  const notice = document.getElementById('save-notice');
+  if(save && save.defeatedClans && save.defeatedClans.length > 0) {
+    btn.textContent = `CONTINUE (Lv.${save.level} · ${save.defeatedClans.length}/5 Clans)`;
+    notice.classList.remove('hidden');
+  } else {
+    btn.textContent = 'BEGIN YOUR PATH';
+    notice.classList.add('hidden');
+  }
+}
+
+function newGameFromSave() {
+  try { localStorage.removeItem('shadowPath_' + selectedCharId); } catch(e) {}
+  document.getElementById('save-notice').classList.add('hidden');
+  document.getElementById('confirm-char-btn').textContent = 'BEGIN YOUR PATH';
+}
+
+function confirmCharacter() {
+  if(!selectedCharId) return;
+  const save = loadSave(selectedCharId);
+  const btnText = document.getElementById('confirm-char-btn').textContent;
+  if(save && btnText.startsWith('CONTINUE')) {
+    G.player = mkPlayer(selectedCharId);
+    G.player.level = save.level || 1;
+    G.player.xp = save.xp || 0;
+    G.player.gold = save.gold || 0;
+    G.player.potions = save.potions != null ? save.potions : 2;
+    G.player.skills = save.skills || [];
+    G.player.activeSkillIdx = save.activeSkillIdx || 0;
+    G.player.currentHp = save.currentHp || G.player.maxHp;
+    G.player.maxHp = save.maxHp || G.player.maxHp;
+    G.player.atk = save.atk || G.player.atk;
+    G.player.def = save.def || G.player.def;
+    G.defeatedClans = save.defeatedClans || [];
+    G.visitedClans = save.visitedClans || [];
+  } else {
+    G.player = mkPlayer(selectedCharId);
+  }
+  showScreen('world-map');
+}
+
+function drawCharPortrait(canvas, charType) {
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const bg = ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*.6);
+  bg.addColorStop(0,charType.color+'44'); bg.addColorStop(1,'transparent');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  drawNinjaFull(ctx, W/2, H*.92, H*.88, charType.color, charType.accent, charType.id);
+}
+
+function drawNinjaFull(ctx,x,y,h,col,acc,type) {
+  ctx.save();
+  const dpr = 1;
+  // Glow
+  ctx.shadowColor=acc; ctx.shadowBlur=12;
+
+  // -- Legs --
+  ctx.fillStyle=col;
+  // left leg
+  ctx.save(); ctx.translate(x-h*.06,y-h*.3);
+  ctx.fillRect(-h*.05,0,h*.09,h*.3); ctx.restore();
+  // right leg (stepped forward)
+  ctx.save(); ctx.translate(x+h*.06,y-h*.3);
+  ctx.rotate(-.12); ctx.fillRect(-h*.04,0,h*.09,h*.3); ctx.restore();
+
+  // -- Belt / waist --
+  ctx.fillStyle=acc;
+  ctx.fillRect(x-h*.12,y-h*.34,h*.24,h*.04);
+
+  // -- Torso --
+  ctx.fillStyle=col;
+  ctx.beginPath();
+  ctx.moveTo(x-h*.13,y-h*.34);
+  ctx.lineTo(x+h*.12,y-h*.34);
+  ctx.lineTo(x+h*.1,y-h*.6);
+  ctx.lineTo(x-h*.11,y-h*.6);
+  ctx.closePath(); ctx.fill();
+
+  // Clan/type marking on torso
+  ctx.fillStyle=acc+'99';
+  ctx.beginPath(); ctx.arc(x,y-h*.47,h*.04,0,Math.PI*2); ctx.fill();
+
+  // -- Arms --
+  ctx.strokeStyle=col; ctx.lineWidth=h*.09; ctx.lineCap='round';
+  ctx.shadowBlur=8;
+  if(type==='shadow'||type==='wind') {
+    // combat pose - right arm extended with sword
+    ctx.beginPath(); ctx.moveTo(x+h*.11,y-h*.54); ctx.lineTo(x+h*.28,y-h*.38); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-h*.11,y-h*.54); ctx.lineTo(x-h*.22,y-h*.40); ctx.stroke();
+  } else if(type==='fire') {
+    // aggressive stance - both arms out
+    ctx.beginPath(); ctx.moveTo(x+h*.11,y-h*.54); ctx.lineTo(x+h*.26,y-h*.44); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-h*.11,y-h*.54); ctx.lineTo(x-h*.26,y-h*.42); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(x+h*.11,y-h*.54); ctx.lineTo(x+h*.2,y-h*.42); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-h*.11,y-h*.54); ctx.lineTo(x-h*.2,y-h*.44); ctx.stroke();
+  }
+
+  // -- Weapon --
+  ctx.shadowBlur=14; ctx.shadowColor=acc;
+  if(type==='fire') {
+    // fire trail
+    ctx.strokeStyle=acc; ctx.lineWidth=h*.02;
+    ctx.beginPath(); ctx.moveTo(x+h*.28,y-h*.38); ctx.lineTo(x+h*.28,y-h*.7); ctx.stroke();
+    // flame tip
+    ctx.fillStyle='#ff6600';
+    ctx.beginPath(); ctx.arc(x+h*.28,y-h*.72,h*.04,0,Math.PI*2); ctx.fill();
+  } else if(type==='poison') {
+    // dagger
+    ctx.strokeStyle=acc; ctx.lineWidth=h*.025;
+    ctx.beginPath(); ctx.moveTo(x+h*.26,y-h*.38); ctx.lineTo(x+h*.34,y-h*.6); ctx.stroke();
+  } else {
+    // sword
+    ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=h*.025;
+    ctx.beginPath(); ctx.moveTo(x+h*.26,y-h*.38); ctx.lineTo(x+h*.38,y-h*.68); ctx.stroke();
+    // guard
+    ctx.strokeStyle=acc; ctx.lineWidth=h*.04;
+    ctx.beginPath(); ctx.moveTo(x+h*.22,y-h*.46); ctx.lineTo(x+h*.30,y-h*.50); ctx.stroke();
+  }
+
+  // -- Head --
+  ctx.shadowBlur=10; ctx.shadowColor=acc;
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.arc(x,y-h*.68,h*.1,0,Math.PI*2); ctx.fill();
+  // mask
+  ctx.fillStyle=acc+'cc';
+  ctx.beginPath(); ctx.arc(x,y-h*.67,h*.065,Math.PI*.1,Math.PI*.9); ctx.fill();
+  // eyes
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.arc(x-h*.03,y-h*.7,h*.018,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+h*.03,y-h*.7,h*.018,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0a0a0f';
+  ctx.beginPath(); ctx.arc(x-h*.03,y-h*.7,h*.010,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+h*.03,y-h*.7,h*.010,0,Math.PI*2); ctx.fill();
+  // headband
+  ctx.fillStyle=acc;
+  ctx.fillRect(x-h*.1,y-h*.73,h*.2,h*.03);
+
+  // -- Scarf / cloak --;
+  ctx.fillStyle=acc+'66';
+  ctx.beginPath();
+  ctx.moveTo(x-h*.08,y-h*.6);
+  ctx.quadraticCurveTo(x-h*.18,y-h*.48,x-h*.22,y-h*.35);
+  ctx.lineTo(x-h*.14,y-h*.34);
+  ctx.quadraticCurveTo(x-h*.1,y-h*.46,x-h*.06,y-h*.58);
+  ctx.closePath(); ctx.fill();
+
+  ctx.restore();
+}
+
+// ── Map canvas ───────────────────────────────────────────────────
+let mapCanvas, mapCtx, mapW, mapH;
+let mapAnimT = 0;
+let mapLoopId = null;
+
+function resizeMapCanvas() {
+  mapCanvas = document.getElementById('map-canvas');
+  const app = document.getElementById('app');
+  mapCanvas.width  = app.clientWidth  * window.devicePixelRatio;
+  mapCanvas.height = app.clientHeight * window.devicePixelRatio;
+  mapCanvas.style.width  = app.clientWidth  + 'px';
+  mapCanvas.style.height = app.clientHeight + 'px';
+  mapW = mapCanvas.width; mapH = mapCanvas.height;
+}
+
+function startMapLoop() {
+  if(mapLoopId) cancelAnimationFrame(mapLoopId);
+  spawnMapParticles();
+  mapLoop(0);
+}
+
+function spawnMapParticles() {
+  G.mapParticles = [];
+  for(let i=0;i<40;i++) {
+    G.mapParticles.push({
+      x: Math.random()*mapW, y: Math.random()*mapH,
+      r: Math.random()*1.5+.5,
+      speed: Math.random()*.3+.1,
+      phase: Math.random()*Math.PI*2,
+      color: Math.random()>.5?'#a855f7':'#4ade80',
+    });
+  }
+}
+
+function mapLoop(ts) {
+  if(G.screen!=='world_map'&&G.screen!=='world-map') return;
+  mapAnimT = ts/1000;
+  if(!mapCtx) mapCtx = mapCanvas.getContext('2d');
+  drawMap();
+  mapLoopId = requestAnimationFrame(mapLoop);
+}
+
+function drawMap() {
+  const ctx = mapCtx;
+  ctx.clearRect(0,0,mapW,mapH);
+
+  // Background sky
+  const sky = ctx.createLinearGradient(0,0,0,mapH);
+  sky.addColorStop(0,'#050510'); sky.addColorStop(.5,'#0a0a1a'); sky.addColorStop(1,'#050a05');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,mapW,mapH);
+
+  // Moon
+  const mx=mapW*.8, my=mapH*.1, mr=mapH*.07;
+  const moonG = ctx.createRadialGradient(mx,my,0,mx,my,mr);
+  moonG.addColorStop(0,'#ffe9b0ee'); moonG.addColorStop(.6,'#ffd06a88'); moonG.addColorStop(1,'transparent');
+  ctx.fillStyle=moonG; ctx.beginPath(); ctx.arc(mx,my,mr,0,Math.PI*2); ctx.fill();
+
+  // Stars
+  ctx.fillStyle='#ffffff';
+  const starSeeds=[[.05,.06],[.15,.04],[.25,.08],[.4,.03],[.55,.07],[.65,.04],[.75,.09],[.88,.06],[.35,.12],[.6,.12],[.9,.15],[.1,.18]];
+  starSeeds.forEach(([sx,sy],i)=>{
+    const twinkle = Math.sin(mapAnimT*1.5+i*1.3)*.4+.6;
+    ctx.globalAlpha=twinkle*.8;
+    ctx.beginPath(); ctx.arc(sx*mapW,sy*mapH,1.2,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // Ground gradient
+  const ground = ctx.createLinearGradient(0,mapH*.6,0,mapH);
+  ground.addColorStop(0,'#0a1a0a'); ground.addColorStop(1,'#050a05');
+  ctx.fillStyle=ground; ctx.fillRect(0,mapH*.6,mapW,mapH*.4);
+
+  // Path between clans
+  ctx.strokeStyle='#1e3a1e'; ctx.lineWidth=4; ctx.setLineDash([8,12]);
+  ctx.beginPath();
+  CLANS.forEach((cl,i)=>{
+    const px=cl.mapX*mapW, py=cl.mapY*mapH+mapH*.15;
+    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  });
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Floating particles
+  G.mapParticles.forEach(p=>{
+    p.y -= p.speed;
+    if(p.y<0) { p.y=mapH; p.x=Math.random()*mapW; }
+    const alpha = (Math.sin(mapAnimT*2+p.phase)+1)*.3+.1;
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // Clan locations
+  CLANS.forEach((cl,i)=>{
+    const cx=cl.mapX*mapW, cy=cl.mapY*mapH+mapH*.15;
+    const beaten = G.defeatedClans.includes(cl.id);
+    const pulse = Math.sin(mapAnimT*3+i)*.5+.5;
+
+    // Glow ring
+    if(!beaten) {
+      ctx.strokeStyle=cl.accent; ctx.lineWidth=2;
+      ctx.globalAlpha=.3+pulse*.3;
+      ctx.beginPath(); ctx.arc(cx,cy,28,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+
+    // Clan icon bg
+    const bg2 = ctx.createRadialGradient(cx,cy,0,cx,cy,22);
+    bg2.addColorStop(0,beaten?'#1a3a1a':cl.color+'cc');
+    bg2.addColorStop(1,beaten?'#0a1a0a':'#0a0a0f');
+    ctx.fillStyle=bg2;
+    ctx.beginPath(); ctx.arc(cx,cy,22,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=beaten?'#22c55e':cl.accent; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(cx,cy,22,0,Math.PI*2); ctx.stroke();
+
+    // Clan label
+    ctx.fillStyle=beaten?'#4ade80':cl.accent;
+    ctx.font=`bold ${Math.round(mapH*.018)}px sans-serif`;
+    ctx.textAlign='center'; ctx.shadowColor=cl.accent; ctx.shadowBlur=8;
+    ctx.fillText(beaten?'✓ '+cl.name:cl.name, cx, cy+38);
+    ctx.fillText(beaten?'Conquered':'Tap to approach', cx, cy+52);
+    ctx.shadowBlur=0;
+
+    // Icon
+    ctx.font=`${Math.round(mapH*.025)}px sans-serif`;
+    ctx.fillText(beaten?'🏯':'⛩️', cx, cy+8);
+  });
+
+  // Player position indicator (wandering between nodes)
+  const px2 = mapW*.5, py2 = mapH*.78;
+  const heroFloat = Math.sin(mapAnimT*2)*3;
+  ctx.shadowColor='#a855f7'; ctx.shadowBlur=20;
+  ctx.font=`${Math.round(mapH*.04)}px sans-serif`;
+  ctx.textAlign='center';
+  ctx.fillText('🥷', px2, py2+heroFloat);
+  ctx.shadowBlur=0;
+
+  ctx.fillStyle='#a855f7';
+  ctx.font=`bold ${Math.round(mapH*.016)}px sans-serif`;
+  ctx.fillText('YOU', px2, py2+mapH*.05+heroFloat);
+
+  // Zombie encounter hints
+  const zombieHints=[[.3,.5],[.55,.7],[.7,.45]];
+  zombieHints.forEach(([zx,zy],i)=>{
+    const zpulse = Math.sin(mapAnimT*2.5+i*2)*.5+.5;
+    ctx.globalAlpha=.4+zpulse*.4;
+    ctx.font=`${Math.round(mapH*.03)}px sans-serif`;
+    ctx.fillText('🧟',zx*mapW,zy*mapH);
+    ctx.globalAlpha=1;
+  });
+
+  ctx.textAlign='left';
+}
+
+// Map tap handler
+document.getElementById('map-canvas') && document.getElementById('map-canvas').addEventListener('click', handleMapTap);
+function handleMapTap(e) {
+  if(G.screen!=='world_map'&&G.screen!=='world-map') return;
+  const rect = mapCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio;
+  const tx = (e.clientX-rect.left)*dpr;
+  const ty = (e.clientY-rect.top)*dpr;
+
+  // Check clan taps
+  for(const cl of CLANS) {
+    const cx=cl.mapX*mapW, cy=cl.mapY*mapH+mapH*.15;
+    const dist=Math.hypot(tx-cx,ty-cy);
+    if(dist<40*dpr) {
+      if(G.defeatedClans.includes(cl.id)) {
+        showMapMsg(cl.name+' conquered! Move on to the next clan.'); return;
+      }
+      approachClan(cl);
+      return;
+    }
+  }
+
+  // Zombie encounter area (lower half)
+  if(ty > mapH*.55) {
+    triggerZombieEncounter();
+  }
+}
+
+function showMapMsg(msg) {
+  const el=document.getElementById('map-msg');
+  el.textContent=msg; el.classList.remove('hidden');
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.add('hidden'),2500);
+}
+
+function approachClan(clan) {
+  G.currentClan = clan;
+  showClanIntro(clan);
+}
+
+function showClanIntro(clan) {
+  document.getElementById('clan-name-big').textContent=clan.name;
+  document.getElementById('clan-desc-text').textContent=clan.desc;
+  document.getElementById('clan-boss-name').textContent=clan.boss;
+  document.getElementById('clan-boss-desc').textContent=clan.bossDesc;
+  document.getElementById('clan-name-big').style.color=clan.accent;
+  document.getElementById('clan-name-big').style.textShadow=`0 0 20px ${clan.accent}`;
+
+  const bannerCanvas = document.getElementById('clan-banner-canvas');
+  drawClanBanner(bannerCanvas, clan);
+  const bossCanvas = document.getElementById('clan-boss-canvas');
+  drawBossPortrait(bossCanvas, clan);
+
+  showScreen('clan-intro');
+}
+
+function drawClanBanner(canvas,clan) {
+  const W=canvas.offsetWidth*devicePixelRatio||320, H=canvas.offsetHeight*devicePixelRatio||160;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  const bg=ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,clan.bgColor); bg.addColorStop(.5,clan.color+'55'); bg.addColorStop(1,clan.bgColor);
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  // Grid lines
+  ctx.strokeStyle=clan.accent+'22'; ctx.lineWidth=1;
+  for(let i=0;i<10;i++){
+    ctx.beginPath(); ctx.moveTo(i*W/9,0); ctx.lineTo(i*W/9,H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*H/9); ctx.lineTo(W,i*H/9); ctx.stroke();
+  }
+
+  // Central symbol
+  ctx.fillStyle=clan.accent+'cc'; ctx.font=`bold ${H*.55}px sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const icons={'dragon':'🐉','iron':'⚙️','flame':'🔥','shadow':'👥','storm':'⚡'};
+  ctx.shadowColor=clan.accent; ctx.shadowBlur=30;
+  ctx.fillText(icons[clan.id]||'⛩️',W/2,H/2);
+  ctx.shadowBlur=0;
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
+
+function drawBossPortrait(canvas, clan) {
+  canvas.width=60; canvas.height=70;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,60,70);
+  const bg=ctx.createRadialGradient(30,35,0,30,35,35);
+  bg.addColorStop(0,clan.color+'44'); bg.addColorStop(1,'transparent');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,60,70);
+  drawNinjaFull(ctx,30,68,62,clan.color,clan.accent,clan.id);
+}
+
+// ── Combat ───────────────────────────────────────────────────────
+let combatCanvas, combatCtx, combatW, combatH;
+let combatLoopId = null;
+let combatAnimT = 0;
+
+function startClanCombat() {
+  if(!G.currentClan) return;
+  const cl = G.currentClan;
+  G.isClanFight = true;
+  const enemy = {
+    name: cl.boss,
+    title: cl.bossTitle,
+    maxHp: cl.bossHp, currentHp: cl.bossHp,
+    atk: cl.bossAtk, def: cl.bossDef,
+    type: cl.bossType,
+    color: cl.color, accent: cl.accent,
+    isClanBoss: true, clanId: cl.id,
+  };
+  startCombat(enemy);
+}
+
+function triggerZombieEncounter() {
+  const zType = ZOMBIE_TYPES[Math.floor(Math.random()*ZOMBIE_TYPES.length)];
+  G.isClanFight = false;
+  const enemy = {
+    name: zType.name,
+    title: 'Undead',
+    maxHp: zType.hp + G.player.level*5,
+    currentHp: zType.hp + G.player.level*5,
+    atk: zType.atk + G.player.level*2,
+    def: zType.def,
+    type: zType.type,
+    color: '#1a3a1a', accent: '#4ade80',
+    isZombie: true,
+    xpReward: zType.xp + G.player.level*5,
+    goldReward: zType.gold + G.player.level*3,
+    id: zType.id,
+  };
+  startCombat(enemy);
+}
+
+function startCombat(enemy) {
+  G.currentEnemy = enemy;
+  G.combat = {
+    turn:0, playerDefending:false, playerClone:false,
+    specialCooldown:0,
+    enemyBurnTurns:0, enemyBurnDmg:0,
+    playerPoisonTurns:0, playerPoisonDmg:0,
+    enemyPoisonTurns:0, enemyPoisonDmg:0,
+    waitingForPlayer:true,
+  };
+
+  document.getElementById('player-combat-name').textContent=G.player.name;
+  document.getElementById('player-combat-class').textContent=G.player.title;
+  document.getElementById('enemy-combat-name').textContent=enemy.name;
+  document.getElementById('enemy-combat-class').textContent=enemy.title;
+  updateCombatBars();
+  updateActionButtons();
+  setCombatMsg('⚔️ '+enemy.name+' stands before you…');
+
+  showScreen('combat-screen');
+  initCombatCanvas();
+  combatLoop(0);
+}
+
+function initCombatCanvas() {
+  combatCanvas = document.getElementById('combat-canvas');
+  const screen = document.getElementById('combat-screen');
+  const ui = document.querySelector('.combat-ui');
+  const uiH = ui.offsetHeight;
+  const totalH = screen.clientHeight;
+  const cH = totalH - uiH;
+  combatCanvas.width  = screen.clientWidth  * devicePixelRatio;
+  combatCanvas.height = cH * devicePixelRatio;
+  combatCanvas.style.width  = screen.clientWidth+'px';
+  combatCanvas.style.height = cH+'px';
+  combatW=combatCanvas.width; combatH=combatCanvas.height;
+}
+
+function combatLoop(ts) {
+  if(G.screen!=='combat_screen'&&G.screen!=='combat-screen'&&G.screen!=='combat') return;
+  combatAnimT = ts/1000;
+  if(!combatCtx) combatCtx=combatCanvas.getContext('2d');
+  drawCombat();
+  combatLoopId = requestAnimationFrame(combatLoop);
+}
+
+function drawCombat() {
+  const ctx=combatCtx;
+  ctx.clearRect(0,0,combatW,combatH);
+  const enemy = G.currentEnemy;
+  const player = G.player;
+
+  // Battlefield bg
+  const bg=ctx.createLinearGradient(0,0,0,combatH);
+  const bgColor = enemy.color||'#0a1a0a';
+  bg.addColorStop(0,'#050510'); bg.addColorStop(.5,bgColor+'55'); bg.addColorStop(1,'#050a05');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,combatW,combatH);
+
+  // Ground line
+  const groundY=combatH*.75;
+  ctx.strokeStyle='#1e3a1e44'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,groundY); ctx.lineTo(combatW,groundY); ctx.stroke();
+
+  // Moon
+  const moonG=ctx.createRadialGradient(combatW*.85,combatH*.12,0,combatW*.85,combatH*.12,combatH*.1);
+  moonG.addColorStop(0,'#ffe9b0cc'); moonG.addColorStop(1,'transparent');
+  ctx.fillStyle=moonG; ctx.beginPath();
+  ctx.arc(combatW*.85,combatH*.12,combatH*.1,0,Math.PI*2); ctx.fill();
+
+  // Floating mist
+  for(let i=0;i<6;i++){
+    const mx=((combatAnimT*15+i*80)%combatW);
+    const my=groundY+Math.sin(combatAnimT+i)*5;
+    ctx.fillStyle='#1a3a1a22';
+    ctx.beginPath(); ctx.ellipse(mx,my,40,8,0,0,Math.PI*2); ctx.fill();
+  }
+
+  // Enemy (right side)
+  const ex=combatW*.72, ey=groundY;
+  const eFloat=Math.sin(combatAnimT*1.5)*3;
+  if(enemy.isZombie) {
+    drawZombieCharacter(ctx,ex,ey+eFloat,combatH*.55,enemy.type);
+  } else {
+    drawNinjaFull(ctx,ex,ey+eFloat,combatH*.55,enemy.color,enemy.accent,enemy.clanId||'dragon');
+  }
+
+  // Burn effect on enemy
+  if(G.combat.enemyBurnTurns>0) {
+    for(let i=0;i<8;i++){
+      const fx=ex+Math.sin(combatAnimT*5+i)*20;
+      const fy=ey-combatH*.2+Math.cos(combatAnimT*4+i)*15;
+      ctx.fillStyle=`hsla(${20+i*10},100%,50%,${.3+Math.sin(combatAnimT*6+i)*.3})`;
+      ctx.beginPath(); ctx.arc(fx,fy,4,0,Math.PI*2); ctx.fill();
+    }
+  }
+
+  // Player (left side)
+  const px2=combatW*.28, py=groundY;
+  const pFloat=Math.sin(combatAnimT*2+1)*3;
+  drawNinjaFull(ctx,px2,py+pFloat,combatH*.52,G.player.color,G.player.accent,G.player.id);
+
+  // Clone effect
+  if(G.combat.playerClone) {
+    ctx.globalAlpha=.35;
+    drawNinjaFull(ctx,px2+combatW*.08,py-5,combatH*.5,G.player.color,G.player.accent,G.player.id);
+    ctx.globalAlpha=1;
+  }
+
+  // Defending glow
+  if(G.combat.playerDefending) {
+    const defG=ctx.createRadialGradient(px2,py-combatH*.25,0,px2,py-combatH*.25,combatH*.2);
+    defG.addColorStop(0,'#3b82f633'); defG.addColorStop(1,'transparent');
+    ctx.fillStyle=defG; ctx.beginPath();
+    ctx.arc(px2,py-combatH*.25,combatH*.2,0,Math.PI*2); ctx.fill();
+  }
+
+  // Combat particles
+  G.combatParticles = G.combatParticles.filter(p=>p.life>0);
+  G.combatParticles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.vy+=.3; p.life-=.02;
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+
+function spawnHitParticles(x,y,color,count=12) {
+  for(let i=0;i<count;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=Math.random()*5+2;
+    G.combatParticles.push({
+      x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed-3,
+      r:Math.random()*4+1, color, life:1
+    });
+  }
+}
+
+function drawZombieCharacter(ctx,x,y,h,type) {
+  ctx.save();
+  const rot=Math.sin(combatAnimT*2)*.04;
+  ctx.translate(x,y); ctx.rotate(rot); ctx.translate(-x,-y);
+
+  const green='#2d5a27', dgrey='#3d4a3a';
+  ctx.shadowColor='#4ade8088'; ctx.shadowBlur=15;
+
+  // Legs (stumbling)
+  ctx.fillStyle=dgrey;
+  ctx.save(); ctx.translate(x-h*.06,y-h*.28); ctx.rotate(.2);
+  ctx.fillRect(-h*.05,0,h*.09,h*.28); ctx.restore();
+  ctx.save(); ctx.translate(x+h*.06,y-h*.28); ctx.rotate(-.1);
+  ctx.fillRect(-h*.04,0,h*.09,h*.28); ctx.restore();
+
+  // Torn clothing
+  ctx.fillStyle=type==='ninja'?'#1a2a1a':dgrey;
+  ctx.beginPath(); ctx.moveTo(x-h*.13,y-h*.28); ctx.lineTo(x+h*.12,y-h*.28);
+  ctx.lineTo(x+h*.11,y-h*.55); ctx.lineTo(x-h*.12,y-h*.55);
+  ctx.closePath(); ctx.fill();
+
+  // Arms outstretched zombie style
+  ctx.strokeStyle=dgrey; ctx.lineWidth=h*.08; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(x+h*.11,y-h*.5); ctx.lineTo(x+h*.3,y-h*.42); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x-h*.11,y-h*.5); ctx.lineTo(x-h*.3,y-h*.42); ctx.stroke();
+
+  // Head
+  ctx.fillStyle=green;
+  ctx.beginPath(); ctx.arc(x,y-h*.63,h*.1,0,Math.PI*2); ctx.fill();
+
+  // Zombie eyes (glowing)
+  ctx.fillStyle='#ff000088';
+  ctx.beginPath(); ctx.arc(x-h*.035,y-h*.66,h*.025,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+h*.035,y-h*.66,h*.025,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ff0000';
+  ctx.beginPath(); ctx.arc(x-h*.035,y-h*.66,h*.012,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+h*.035,y-h*.66,h*.012,0,Math.PI*2); ctx.fill();
+
+  // Decay marks
+  ctx.strokeStyle='#1a3a1a'; ctx.lineWidth=h*.008;
+  ctx.beginPath(); ctx.moveTo(x-h*.04,y-h*.7); ctx.lineTo(x-h*.02,y-h*.64); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+h*.02,y-h*.71); ctx.lineTo(x+h*.04,y-h*.65); ctx.stroke();
+
+  // Torn clothes marks
+  ctx.strokeStyle='#1a1a1a99'; ctx.lineWidth=h*.012;
+  for(let i=0;i<3;i++){
+    ctx.beginPath(); ctx.moveTo(x-h*.1+i*h*.08,y-h*.45); ctx.lineTo(x-h*.06+i*h*.08,y-h*.3); ctx.stroke();
+  }
+
+  // Horde extra zombies
+  if(type==='horde') {
+    ctx.globalAlpha=.5;
+    drawZombieCharacter2(ctx,x-h*.55,y,h*.7,'#1a3a1a');
+    drawZombieCharacter2(ctx,x+h*.55,y,h*.65,'#1a3a1a');
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+function drawZombieCharacter2(ctx,x,y,h,color) {
+  ctx.fillStyle=color;
+  ctx.fillRect(x-h*.04,y-h*.5,h*.08,h*.35);
+  ctx.beginPath(); ctx.arc(x,y-h*.56,h*.08,0,Math.PI*2); ctx.fill();
+  ctx.fillRect(x-h*.2,y-h*.48,h*.15,h*.04);
+  ctx.fillRect(x+h*.05,y-h*.48,h*.15,h*.04);
+}
+
+function updateCombatBars() {
+  const p=G.player, e=G.currentEnemy;
+  const ppct=Math.max(0,p.currentHp/p.maxHp*100);
+  const epct=Math.max(0,e.currentHp/e.maxHp*100);
+  document.getElementById('player-hp-fill').style.width=ppct+'%';
+  document.getElementById('enemy-hp-fill').style.width=epct+'%';
+  document.getElementById('player-hp-text').textContent=`${Math.max(0,p.currentHp)}/${p.maxHp}`;
+  document.getElementById('enemy-hp-text').textContent=`${Math.max(0,e.currentHp)}/${e.maxHp}`;
+}
+
+function updateActionButtons() {
+  const p=G.player;
+  document.getElementById('potion-desc').textContent=`${p.potions} potion${p.potions!==1?'s':''}`;
+
+  p.activeSkillIdx = ((p.activeSkillIdx || 0) % Math.max(1, p.skills.length));
+  const activeId = p.skills.length > 0 ? p.skills[p.activeSkillIdx] : null;
+  const skill = activeId ? SKILLS.find(s=>s.id===activeId) : null;
+  const cycleEl = document.getElementById('skill-cycle');
+  if(skill) {
+    document.getElementById('btn-special').classList.remove('disabled');
+    document.querySelector('#btn-special .action-icon').textContent=skill.icon;
+    document.querySelector('#btn-special .action-name').textContent=skill.name.toUpperCase();
+    document.getElementById('special-desc').textContent=skill.desc;
+    if(G.combat.specialCooldown>0) {
+      document.getElementById('btn-special').classList.add('disabled');
+      document.getElementById('special-cost').textContent=`Cooldown: ${G.combat.specialCooldown}`;
+    } else {
+      document.getElementById('special-cost').textContent='Ready!';
+    }
+    if(p.skills.length > 1) {
+      cycleEl.classList.remove('hidden');
+      document.getElementById('skill-idx-label').textContent=`${p.activeSkillIdx+1}/${p.skills.length}`;
+    } else {
+      cycleEl.classList.add('hidden');
+    }
+  } else {
+    document.getElementById('btn-special').classList.add('disabled');
+    document.querySelector('#btn-special .action-name').textContent='SPECIAL';
+    document.getElementById('special-desc').textContent='Win a clan fight to unlock';
+    document.getElementById('special-cost').textContent='';
+    cycleEl.classList.add('hidden');
+  }
+
+  if(p.potions<=0) document.getElementById('btn-item').classList.add('disabled');
+  else document.getElementById('btn-item').classList.remove('disabled');
+}
+
+function setCombatMsg(msg) {
+  document.getElementById('combat-msg').textContent=msg;
+}
+
+function disableActions() {
+  document.querySelectorAll('.action-btn').forEach(b=>b.classList.add('disabled'));
+}
+function enableActions() {
+  document.querySelectorAll('.action-btn').forEach(b=>b.classList.remove('disabled'));
+  updateActionButtons();
+}
+
+function playerAction(type) {
+  if(!G.combat.waitingForPlayer) return;
+  G.combat.waitingForPlayer=false;
+  disableActions();
+
+  const p=G.player, e=G.currentEnemy;
+  let msg='';
+
+  if(type==='defend') {
+    G.combat.playerDefending=true;
+    if(p.skills.includes('iron_block')&&G.combat.specialCooldown===0) {
+      msg='🛡️ You focus your chi into an unbreakable stance!';
+    } else {
+      msg='🛡️ You take a defensive stance, ready to absorb the next blow.';
+    }
+    spawnHitParticles(combatW*.28,combatH*.45,'#3b82f6',8);
+    setTimeout(()=>enemyTurn(msg),600);
+    return;
+  }
+
+  if(type==='item') {
+    if(p.potions<=0) { enableActions(); G.combat.waitingForPlayer=true; return; }
+    p.potions--;
+    const heal=Math.round(p.maxHp*.35);
+    p.currentHp=Math.min(p.maxHp, p.currentHp+heal);
+    updateCombatBars();
+    spawnHitParticles(combatW*.28,combatH*.45,'#4ade80',12);
+    msg=`🧪 You drink a health potion and recover ${heal} HP!`;
+    setTimeout(()=>enemyTurn(msg),600);
+    return;
+  }
+
+  if(type==='special') {
+    const activeId = p.skills.length > 0 ? p.skills[p.activeSkillIdx % p.skills.length] : null;
+    const skill = activeId ? SKILLS.find(s=>s.id===activeId) : null;
+    if(!skill||G.combat.specialCooldown>0) { enableActions(); G.combat.waitingForPlayer=true; return; }
+    G.combat.specialCooldown=skill.cooldown;
+
+    if(skill.isDefend) {
+      G.combat.playerDefending=true;
+      msg=`${skill.icon} ${skill.name}: You create an impenetrable energy barrier!`;
+      spawnHitParticles(combatW*.28,combatH*.45,'#a855f7',16);
+      setTimeout(()=>enemyTurn(msg),600);
+      return;
+    }
+    if(skill.clone) {
+      G.combat.playerClone=true;
+      msg=`${skill.icon} ${skill.name}: A shadow clone appears — 50% chance attacks miss you!`;
+      spawnHitParticles(combatW*.28,combatH*.45,'#818cf8',16);
+      setTimeout(()=>enemyTurn(msg),600);
+      return;
+    }
+
+    let totalDmg=0;
+    const hits=skill.hits||1;
+    for(let h=0;h<hits;h++){
+      const rawDmg=Math.round(p.atk*skill.dmgMult*(1+Math.random()*.3));
+      const dmg=Math.max(1,rawDmg-Math.floor(e.def/2));
+      e.currentHp-=dmg; totalDmg+=dmg;
+    }
+
+    if(skill.burn) { G.combat.enemyBurnTurns=skill.burnTurns||3; G.combat.enemyBurnDmg=skill.burn; }
+    if(skill.poison) { G.combat.enemyPoisonTurns=skill.poisonTurns||5; G.combat.enemyPoisonDmg=skill.poison; }
+    if(skill.drain) { const heal=Math.round(totalDmg*skill.drain); p.currentHp=Math.min(p.maxHp,p.currentHp+heal); }
+
+    msg=`${skill.icon} ${skill.name}: ${hits>1?`${hits}× hit for`:'deals'} ${totalDmg} damage!`;
+    spawnHitParticles(combatW*.72,combatH*.45,e.accent||'#ef4444',16);
+    updateCombatBars();
+    if(e.currentHp<=0) { setTimeout(()=>combatVictory(),600); return; }
+    setTimeout(()=>enemyTurn(msg),600);
+    return;
+  }
+
+  // Basic attack
+  {
+    const crit=Math.random()<p.critChance;
+    const rawDmg=Math.round(p.atk*(crit?1.8:1)*(1+Math.random()*.25));
+    const dmg=Math.max(1,rawDmg-Math.floor(e.def/2));
+    e.currentHp-=dmg;
+    msg=crit?`⚡ Critical Strike! ${dmg} damage!`:`⚔️ You strike for ${dmg} damage.`;
+    spawnHitParticles(combatW*.72,combatH*.45,e.accent||'#ef4444',crit?18:10);
+    updateCombatBars();
+    if(e.currentHp<=0) { setTimeout(()=>combatVictory(),600); return; }
+    setTimeout(()=>enemyTurn(msg),600);
+  }
+}
+
+function enemyTurn(playerMsg) {
+  const p=G.player, e=G.currentEnemy;
+  setCombatMsg(playerMsg);
+  G.combat.turn++;
+
+  // DOT effects
+  let dotMsg='';
+  if(G.combat.enemyBurnTurns>0) {
+    e.currentHp-=G.combat.enemyBurnDmg; G.combat.enemyBurnTurns--;
+    dotMsg+=` 🔥 ${G.combat.enemyBurnDmg} burn damage.`;
+  }
+  if(G.combat.enemyPoisonTurns>0) {
+    e.currentHp-=G.combat.enemyPoisonDmg; G.combat.enemyPoisonTurns--;
+    dotMsg+=` ☠️ ${G.combat.enemyPoisonDmg} poison damage.`;
+  }
+  if(G.combat.playerPoisonTurns>0) {
+    p.currentHp-=G.combat.playerPoisonDmg; G.combat.playerPoisonTurns--;
+  }
+  updateCombatBars();
+  if(e.currentHp<=0) { setTimeout(()=>combatVictory(),400); return; }
+  if(p.currentHp<=0) { setTimeout(()=>combatDefeat(),400); return; }
+
+  if(G.combat.specialCooldown>0) G.combat.specialCooldown--;
+
+  // Enemy attack
+  setTimeout(()=>{
+    if(G.combat.playerClone && Math.random()<.5) {
+      G.combat.playerClone=false;
+      const fullMsg=playerMsg+(dotMsg?'\n'+dotMsg:'')+'\n👥 Enemy hits your clone — no damage!';
+      setCombatMsg(fullMsg);
+    } else {
+      G.combat.playerClone=false;
+      const rawDmg=Math.round(e.atk*(1+Math.random()*.3));
+      let dmg=Math.max(1,rawDmg-Math.floor(p.def/2));
+      if(G.combat.playerDefending){
+        const hasIronBlock=p.skills.includes('iron_block')&&SKILLS.find(s=>s.id==='iron_block');
+        dmg = hasIronBlock?0:Math.floor(dmg*.5);
+      }
+      G.combat.playerDefending=false;
+      p.currentHp-=dmg;
+      updateCombatBars();
+      spawnHitParticles(combatW*.28,combatH*.45,'#ef4444',10);
+
+      const atkVerbs=['lunges','strikes','claws','charges','smashes'];
+      const verb=atkVerbs[G.combat.turn%atkVerbs.length];
+      const fullMsg=playerMsg+(dotMsg?' '+dotMsg:'')+`\n💢 ${e.name} ${verb} — ${dmg} damage!`;
+      setCombatMsg(fullMsg);
+
+      // Poison boss ability
+      if(e.isClanBoss && G.combat.turn%4===0 && !G.combat.playerPoisonTurns) {
+        G.combat.playerPoisonTurns=3; G.combat.playerPoisonDmg=8;
+        setCombatMsg(fullMsg+'\n☠️ Poisoned!');
+      }
+    }
+
+    if(p.currentHp<=0) { setTimeout(()=>combatDefeat(),600); return; }
+    G.combat.waitingForPlayer=true;
+    enableActions();
+  },700);
+}
+
+function combatVictory() {
+  cancelAnimationFrame(combatLoopId); combatLoopId=null;
+  const e=G.currentEnemy, p=G.player;
+  let xpGain=0, goldGain=0, potionGain=0, newSkill=null;
+
+  if(e.isZombie) {
+    xpGain=e.xpReward; goldGain=e.goldReward;
+    if(Math.random()<.35) potionGain=1;
+  } else if(e.isClanBoss) {
+    xpGain=120+G.defeatedClans.length*40;
+    goldGain=80+G.defeatedClans.length*30;
+    potionGain=2;
+    const clan=CLANS.find(c=>c.id===e.clanId);
+    if(clan&&!G.defeatedClans.includes(clan.id)) {
+      G.defeatedClans.push(clan.id);
+      const sk=SKILLS[clan.rewardSkill];
+      if(sk&&!p.skills.includes(sk.id)) { newSkill=sk; }
+    }
+  }
+
+  p.xp+=xpGain; p.gold+=goldGain;
+  if(potionGain) p.potions+=potionGain;
+  if(newSkill) p.skills.push(newSkill.id);
+
+  // Level up
+  const lvl=checkLevelUp();
+
+  document.getElementById('victory-title').textContent=
+    e.isClanBoss?'CLAN CONQUERED!':'VICTORY!';
+  document.getElementById('victory-msg').textContent=
+    e.isClanBoss
+      ? `You have defeated ${e.name} and earned the respect of ${G.currentClan.name}!`
+      : `${e.name} crumbles to dust. The road is yours.`;
+
+  document.getElementById('rew-xp').textContent=`+${xpGain} XP${lvl?' (Level Up!→'+lvl+')':''}`;
+  document.getElementById('rew-gold').textContent=`+${goldGain} 💰`;
+  if(potionGain) {
+    document.getElementById('rew-potion-row').classList.remove('hidden');
+    document.getElementById('rew-potion').textContent=`+${potionGain}`;
+  } else {
+    document.getElementById('rew-potion-row').classList.add('hidden');
+  }
+
+  if(newSkill) {
+    document.getElementById('new-skill-box').classList.remove('hidden');
+    document.getElementById('new-skill-name').textContent=newSkill.icon+' '+newSkill.name;
+    document.getElementById('new-skill-desc').textContent=newSkill.desc;
+    const btn=document.getElementById('victory-continue-btn');
+    if(G.defeatedClans.length===CLANS.length) {
+      btn.textContent='🏆 Path Complete!';
+    } else {
+      btn.textContent='Continue Journey →';
+    }
+  } else {
+    document.getElementById('new-skill-box').classList.add('hidden');
+  }
+
+  showScreen('victory-screen');
+  updateHUD();
+  saveGame();
+}
+
+function checkLevelUp() {
+  const p=G.player;
+  const maxLevel=LEVEL_TITLES.length;
+  while(p.level<maxLevel && p.xp>=XP_PER_LEVEL[p.level]) {
+    p.level++;
+    p.maxHp=Math.round(p.maxHp*1.12);
+    p.currentHp=p.maxHp;
+    p.atk=Math.round(p.atk*1.08);
+    p.def=Math.round(p.def*1.1);
+    p.title=LEVEL_TITLES[p.level-1];
+    return p.level;
+  }
+  return null;
+}
+
+function combatDefeat() {
+  cancelAnimationFrame(combatLoopId); combatLoopId=null;
+  const e=G.currentEnemy;
+  G.player.currentHp=Math.round(G.player.maxHp*.4); // revive at 40%
+
+  let trainingSkill;
+  if(e.isClanBoss) {
+    const cl=CLANS.find(c=>c.id===e.clanId);
+    if(cl) {
+      trainingSkill=SKILLS[cl.rewardSkill];
+    }
+  } else {
+    const basic=['shadow_clone','iron_block'];
+    trainingSkill=SKILLS.find(s=>basic.includes(s.id)&&!G.player.skills.includes(s.id))||SKILLS[0];
+  }
+  trainingSkill=trainingSkill||SKILLS[0];
+
+  document.getElementById('defeat-msg').textContent=
+    e.isClanBoss
+      ? `${e.name} was too powerful. Train their technique and return stronger.`
+      : 'The undead overwhelmed you. Take time to recover your strength.';
+
+  document.getElementById('training-skill-name').textContent=trainingSkill.icon+' '+trainingSkill.name;
+  document.getElementById('training-skill-desc').textContent=trainingSkill.desc;
+  G.training.skill=trainingSkill;
+
+  showScreen('defeat-screen');
+}
+
+function continueFromVictory() {
+  if(G.defeatedClans.length===CLANS.length) {
+    showGameComplete();
+  } else {
+    showScreen('world-map');
+  }
+}
+
+function retryFromDefeat() {
+  G.player.currentHp=Math.round(G.player.maxHp*.4);
+  showScreen('world-map');
+}
+
+function goToTraining() {
+  const sk=G.training.skill;
+  if(!sk) { showScreen('world-map'); return; }
+  document.getElementById('train-skill-title').textContent=sk.icon+' '+sk.name;
+  document.getElementById('train-skill-lore').textContent=sk.desc;
+  G.training.taps=0;
+  G.training.required=15+G.player.level*2;
+  document.getElementById('challenge-prompt').textContent=`Tap the target ${G.training.required} times to master ${sk.name}!`;
+  updateTrainingUI();
+  showScreen('training-screen');
+  drawTrainingCanvas();
+}
+
+function handleTrainingTap() {
+  if(!G.training.skill) return;
+  G.training.taps++;
+  const target=document.getElementById('tap-target');
+  target.style.transform='scale(0.88)';
+  setTimeout(()=>target.style.transform='',100);
+  spawnTrainingParticle();
+  updateTrainingUI();
+  if(G.training.taps>=G.training.required) {
+    // Add skill
+    if(!G.player.skills.includes(G.training.skill.id)) {
+      G.player.skills.push(G.training.skill.id);
+      saveGame();
+    }
+    G.training.skill=null;
+    setTimeout(()=>{
+      showMapMsg('🥋 Skill mastered! Return to the clan and try again.');
+      showScreen('world-map');
+    },500);
+  }
+}
+
+let trainingParticles=[];
+function spawnTrainingParticle() {
+  const t=document.getElementById('tap-target');
+  const r=t.getBoundingClientRect();
+  trainingParticles.push({
+    x:r.left+r.width/2, y:r.top+r.height/2,
+    vx:(Math.random()-.5)*4, vy:Math.random()*-5-2,
+    life:1, color:'#a855f7', r:4,
+  });
+}
+
+function drawTrainingCanvas() {
+  const canvas=document.getElementById('training-canvas');
+  canvas.width=canvas.offsetWidth*devicePixelRatio||280;
+  canvas.height=canvas.offsetHeight*devicePixelRatio||160;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  ctx.fillStyle='#0a0a0f'; ctx.fillRect(0,0,W,H);
+
+  // Dojo floor
+  ctx.fillStyle='#12111f'; ctx.fillRect(0,H*.6,W,H*.4);
+  ctx.strokeStyle='#1e1b2e'; ctx.lineWidth=1;
+  for(let i=0;i<8;i++){
+    ctx.beginPath(); ctx.moveTo(i*W/7,H*.6); ctx.lineTo(i*W/7,H); ctx.stroke();
+  }
+  ctx.strokeStyle='#1e1b2e'; ctx.lineWidth=1;
+  for(let i=0;i<4;i++){
+    ctx.beginPath(); ctx.moveTo(0,H*.6+i*H*.13); ctx.lineTo(W,H*.6+i*H*.13); ctx.stroke();
+  }
+
+  // Training ninja
+  drawNinjaFull(ctx,W*.35,H*.82,H*.7,G.player.color,G.player.accent,G.player.id);
+
+  // Training dummy
+  ctx.fillStyle='#3d2a1a';
+  ctx.fillRect(W*.65-6,H*.4,12,H*.45);
+  ctx.fillStyle='#5a3a2a';
+  ctx.beginPath(); ctx.arc(W*.65,H*.38,H*.1,0,Math.PI*2); ctx.fill();
+  ctx.fillRect(W*.52,H*.5,W*.26,H*.07);
+
+  // Glowing skill symbol
+  ctx.font=`${H*.25}px sans-serif`;
+  ctx.textAlign='center';
+  ctx.shadowColor='#a855f7'; ctx.shadowBlur=20;
+  ctx.fillText(G.training.skill?G.training.skill.icon:'🥋',W*.65,H*.75);
+  ctx.shadowBlur=0; ctx.textAlign='left';
+}
+
+function updateTrainingUI() {
+  const pct=Math.min(100,(G.training.taps/G.training.required)*100);
+  document.getElementById('tap-progress-fill').style.width=pct+'%';
+  document.getElementById('tap-count').textContent=`${G.training.taps} / ${G.training.required}`;
+}
+
+// ── HUD ─────────────────────────────────────────────────────────
+function updateHUD() {
+  const p=G.player;
+  if(!p) return;
+  document.getElementById('hud-name').textContent=p.name;
+  document.getElementById('hud-level').textContent=`Level ${p.level} · ${p.title}`;
+  document.getElementById('hud-hp-fill').style.width=(p.currentHp/p.maxHp*100)+'%';
+  const xpPrev=XP_PER_LEVEL[p.level-1]||0;
+  const xpNext=XP_PER_LEVEL[p.level]||9999;
+  const xpPct=((p.xp-xpPrev)/(xpNext-xpPrev)*100);
+  document.getElementById('hud-xp-fill').style.width=Math.min(100,xpPct)+'%';
+  document.getElementById('hud-gold').textContent=`💰 ${p.gold}`;
+  document.getElementById('hud-skills').textContent=`Skills: ${p.skills.length}`;
+}
+
+// ── Loot popup ───────────────────────────────────────────────────
+function showLoot(items) {
+  const list=document.getElementById('loot-items-list');
+  list.innerHTML=items.map(i=>`<div class="loot-item"><div class="loot-item-icon">${i.icon}</div><div><div class="loot-item-name">${i.name}</div><div class="loot-item-val">${i.val}</div></div></div>`).join('');
+  document.getElementById('loot-popup').classList.add('show');
+}
+function closeLoot() {
+  document.getElementById('loot-popup').classList.remove('show');
+}
+
+// ── Game complete ────────────────────────────────────────────────
+function showGameComplete() {
+  document.getElementById('victory-title').textContent='MASTER FOUND!';
+  document.getElementById('victory-msg').textContent=
+    '🏯 You have conquered all five clans and proven yourself worthy. A legendary master steps forward to complete your training. Your shadow path is fulfilled.';
+  document.getElementById('rew-xp').textContent='Journey Complete!';
+  document.getElementById('rew-gold').textContent=`${G.player.gold} 💰 Total`;
+  document.getElementById('rew-potion-row').classList.add('hidden');
+  document.getElementById('new-skill-box').classList.remove('hidden');
+  document.getElementById('new-skill-name').textContent='🌟 Shadow Master';
+  document.getElementById('new-skill-desc').textContent=
+    `${G.player.name} has mastered ${G.player.skills.length} clan techniques and reached Level ${G.player.level}.`;
+  document.getElementById('victory-continue-btn').textContent='🔄 Play Again';
+  document.getElementById('victory-continue-btn').onclick=()=>{ location.reload(); };
+  showScreen('victory-screen');
+}
+
+// ── How to play ──────────────────────────────────────────────────
+function showHowToPlay() {
+  alert(`⚔️ SHADOW PATH — HOW TO PLAY
+
+🥷 You are a clanless ninja wandering the land in search of a master worthy of completing your training.
+
+🗺️ WORLD MAP
+• Tap clan banners (⛩️) to approach and challenge their champion
+• Tap the lower map area to trigger zombie encounters
+
+⚔️ COMBAT
+• STRIKE — Basic attack, may critically hit
+• SPECIAL — Your latest learned clan skill (unlocked by winning clan fights)
+• FOCUS — Take a defensive stance, halve incoming damage
+• POTION — Restore 35% HP (you start with 2)
+
+🏯 CLAN FIGHTS
+• Win → Earn a new special skill, XP, gold, and potions
+• Lose → Practice the required skill in training, then retry
+
+🧟 ZOMBIE ENCOUNTERS
+• Fight zombies between clans for XP and gold
+• Stronger zombies appear as you level up
+
+📈 LEVELING
+• Each level boosts your HP, ATK, and DEF
+• New level titles unlock as you grow
+
+Defeat all 5 clan champions to complete the Shadow Path!`);
+}
+
+// ── Game init ────────────────────────────────────────────────────
+function startNewGame() {
+  if(G.titleAnimFrame) cancelAnimationFrame(G.titleAnimFrame);
+  buildCharGrid();
+  showScreen('char-select');
+}
+
+// ── Skill cycling ────────────────────────────────────────────────
+function cycleSkill(dir) {
+  const p = G.player;
+  if(!p || p.skills.length < 2) return;
+  p.activeSkillIdx = ((p.activeSkillIdx || 0) + dir + p.skills.length) % p.skills.length;
+  G.combat.specialCooldown = 0;
+  updateActionButtons();
+}
+
+// ── Save / Load ───────────────────────────────────────────────────
+function saveGame() {
+  const p = G.player;
+  if(!p) return;
+  try {
+    localStorage.setItem('shadowPath_' + p.id, JSON.stringify({
+      charId: p.id,
+      level: p.level,
+      xp: p.xp,
+      gold: p.gold,
+      potions: p.potions,
+      skills: p.skills,
+      activeSkillIdx: p.activeSkillIdx || 0,
+      defeatedClans: G.defeatedClans,
+      visitedClans: G.visitedClans,
+      currentHp: p.currentHp,
+      maxHp: p.maxHp,
+      atk: p.atk,
+      def: p.def,
+    }));
+  } catch(e) {}
+}
+
+function loadSave(charId) {
+  try {
+    const raw = localStorage.getItem('shadowPath_' + charId);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+// Post-load canvas event wiring (map tap needs canvas to exist)
+window.addEventListener('DOMContentLoaded', ()=>{
+  initTitleArt();
+  const mc = document.getElementById('map-canvas');
+  mc.addEventListener('click', handleMapTap);
+  mc.addEventListener('touchend', e=>{
+    e.preventDefault();
+    const t=e.changedTouches[0];
+    handleMapTap({clientX:t.clientX, clientY:t.clientY, target:mc});
+  }, {passive:false});
+
+  window.addEventListener('resize', ()=>{
+    if(G.screen==='world_map'||G.screen==='world-map') {
+      resizeMapCanvas();
+      spawnMapParticles();
+    }
+    if(G.screen==='title') {
+      if(G.titleAnimFrame) cancelAnimationFrame(G.titleAnimFrame);
+      initTitleArt();
+    }
+  });
+});
+</script>
+</body>
+</html>
