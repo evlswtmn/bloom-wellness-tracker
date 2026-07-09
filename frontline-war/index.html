@@ -843,9 +843,10 @@ function shuffle(arr) {
 /* Gameplay-friendly light shuffle: only shuffles the back half of won cards
    so the game doesn't lock into endless loops but also feels fair. */
 function lightShuffle(arr) {
-  const half = Math.floor(arr.length/2);
-  for (let i = arr.length-1; i > half; i--) {
-    const j = half + Math.floor(Math.random()*(i-half+1));
+  // Full Fisher–Yates: won piles must return in random order, otherwise
+  // War games with deterministic return order can cycle near-forever
+  for (let i = arr.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
     [arr[i],arr[j]] = [arr[j],arr[i]];
   }
   return arr;
@@ -1168,12 +1169,21 @@ async function handleWar(pile) {
 
   // Edge cases: no cards left for showdown
   if (!G.playerDeck.length && !G.npcDeck.length) {
-    setSuspense('Both sides exhausted!'); roundResult('Both exhausted — draw','#fbbf24');
-    const half=Math.floor(pile.length/2);
+    // Both armies fully spent mid-war: territory decides it (splitting the
+    // pile back would replay the same tie forever when only 2 cards remain)
+    setSuspense('Both sides exhausted!');
+    const winner = G.frontline > 0 ? 'player'
+                 : G.frontline < 0 ? 'npc'
+                 : (Math.random() < 0.5 ? 'player' : 'npc');
     lightShuffle(pile);
-    G.playerDeck.push(...pile.slice(0,half));
-    G.npcDeck.push(...pile.slice(half));
-    return;
+    if (winner === 'player') {
+      roundResult('Both exhausted — you hold the ground!','#4ade80');
+      G.playerDeck.push(...pile);
+    } else {
+      roundResult('Both exhausted — enemy holds the ground!','#f87171');
+      G.npcDeck.push(...pile);
+    }
+    await ms(d); return;
   }
   if (!G.playerDeck.length) {
     setSuspense('You were overrun!');
